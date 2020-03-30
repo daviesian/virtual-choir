@@ -68,7 +68,7 @@ let Home = ({dispatch, backingTrack, transportTime, layers}) => {
 
         <Transport backingTrack={backingTrack} tracks={layers}/>
         <List>
-            {layers.map(layer => <Layer layer={layer}/>)}
+            {layers.map((layer, i) => <Layer key={i} layer={layer}/>)}
         </List>
     </div>;
 };

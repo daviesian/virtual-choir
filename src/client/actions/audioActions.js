@@ -11,6 +11,7 @@ export const reset = () => async dispatch => {
 };
 
 export const loadBackingTrack = url => async dispatch => {
+    dispatch({type:"ws/loadBackingTrack", url});
     await dispatch({type:"audio/init"});
 
     let {duration, rms} = await dispatch({

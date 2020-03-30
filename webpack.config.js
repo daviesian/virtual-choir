@@ -9,7 +9,7 @@ let cssClassName = '[local]__[path][name]'; // We may choose to switch this to [
 let context = path.resolve(__dirname, 'src');
 
 module.exports = {
-    entry: ['@babel/polyfill', 'react-hot-loader/patch', "./index.jsx"],
+    entry: ['@babel/polyfill', 'webpack-hot-middleware/client', 'react-hot-loader/patch', "./client/index.jsx"],
     mode: "development",
     context: context,
     module: {
@@ -76,6 +76,7 @@ module.exports = {
         //     filename: 'choir.css',
         // }),
         //new BundleAnalyzerPlugin(),
+        new webpack.HotModuleReplacementPlugin(),
     ],
     optimization: {
         splitChunks: {

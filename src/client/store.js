@@ -4,6 +4,7 @@ import {applyMiddleware, createStore} from 'redux'
 import {createBrowserHistory} from "history";
 import audioMiddleware from './audioMiddleware';
 import produce from "immer";
+import wsMiddleware from "./wsMiddleware";
 
 const loggerMiddleware = createLogger({
     predicate: (getState, {_log}) => _log !== false,
@@ -99,6 +100,7 @@ export const store = createStore(
         thunkMiddleware,
         loggerMiddleware,
         audioMiddleware,
+        wsMiddleware,
     )
 );
 
