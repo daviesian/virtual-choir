@@ -3,10 +3,10 @@ const app = express();
 require('express-ws')(app);
 const path = require("path");
 
-const root = path.resolve(__dirname, "../../");
+const root = path.resolve("./src");
 
 const webpack = require("webpack");
-const webpackConfig = require("../../webpack.config");
+const webpackConfig = require("../../webpack.client.config");
 const compiler = webpack(webpackConfig);
 // webpack hmr
 app.use(

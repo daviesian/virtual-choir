@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node src/server/index.js",
-    "watch": "webpack --mode development --watch",
+    "start": "node dist/server.js",
+    "watch": "webpack --mode development --watch --config webpack.server.config.js",
     "build": "webpack --mode production",
-    "build-dev": "webpack --mode development",
+    "build-client-dev": "webpack --mode development --config webpack.client.config.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Ian Davies",
@@ -86,6 +86,7 @@
     "webpack-cli": "^3.3.9",
     "webpack-dev-middleware": "latest",
     "webpack-dev-server": "^3.9.0",
-    "webpack-hot-middleware": "^2.25.0"
+    "webpack-hot-middleware": "^2.25.0",
+    "webpack-node-externals": "^1.7.2"
   }
 }

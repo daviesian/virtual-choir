@@ -1,12 +1,9 @@
 const path = require("path");
 const webpack = require("webpack");
-const player = require('node-wav-player');
-const CopyWebpackPlugin = require('copy-webpack-plugin')
-const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
+const nodeExternals = require('webpack-node-externals');
 
-let cssClassName = '[local]__[path][name]'; // We may choose to switch this to [contenthash:16] in production. Or not.
-let context = path.resolve(__dirname, 'src');
+let context = path.resolve( './src');
 
 module.exports = {
     entry: ['@babel/polyfill', 'webpack-hot-middleware/client', 'react-hot-loader/patch', "./client/index.jsx"],
@@ -18,7 +15,7 @@ module.exports = {
                 test: /\.(js|jsx)$/,
                 exclude: /(node_modules)/,
                 use: ["babel-loader"],
-            },
+            }/*,
             {
                 test: /\.s?css$/,
                 use: [
@@ -47,7 +44,7 @@ module.exports = {
                         }
                     }
                 ]
-            }
+            }*/
         ]
     },
     resolve: {
@@ -60,31 +57,19 @@ module.exports = {
     output: {
         path: path.resolve(__dirname, "dist"),
         publicPath: "/",
-        filename: "virtual-choir.js",
+        filename: "client.js",
     },
     devtool: false, // We'll configure source maps ourselves, thanks very much.
     plugins: [
-        // Produce a full source-map for CSS, because for some reason the eval-source-map doesn't work with inline sources. And we want inline sources, because they're much faster to build during development.
-        new webpack.SourceMapDevToolPlugin({
-            test: /\.s?css$/
-        }),
         // Just build eval-source-map for JS, which is much faster than source-map, but only gives us line-level precision. That'll do for now.
         new webpack.EvalSourceMapDevToolPlugin({
             test: /\.jsx?$/
         }),
-        // new MiniCssExtractPlugin({
-        //     filename: 'choir.css',
-        // }),
-        //new BundleAnalyzerPlugin(),
         new webpack.HotModuleReplacementPlugin(),
     ],
     optimization: {
         splitChunks: {
             chunks: 'all',
         },
-    },
-    devServer: {
-        contentBase: './static',
-        hot: true
-    },
+    }
 };
