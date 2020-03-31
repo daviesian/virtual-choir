@@ -3,8 +3,8 @@ import {createLogger} from 'redux-logger'
 import {applyMiddleware, createStore} from 'redux'
 import {createBrowserHistory} from "history";
 import audioMiddleware from './audioMiddleware';
-import produce from "immer";
 import wsMiddleware from "./wsMiddleware";
+import {produce} from "immer";
 
 const loggerMiddleware = createLogger({
     predicate: (getState, {_log}) => _log !== false,
@@ -22,75 +22,63 @@ const initialState = {
     }
 };
 
-let rootReducer = (state, action) => {
+let rootReducer = produce((state, action) => {
     if (state === undefined)
         return initialState;
 
     switch (action.type) {
 
         case "INIT_DONE":
-            return produce(state, newState => {
-                newState.audioInitialised = true;
-            });
+            state.audioInitialised = true;
+            break;
 
         case "RESET":
             return initialState;
 
         case "BACKING_TRACK_LOADED":
-            return produce(state, newState => {
-                newState.backingTrack = {
-                    name: action.name,
-                    duration: action.duration,
-                    id: action.id,
-                    rms: action.rms,
-                };
-            });
+            state.backingTrack = {
+                name: action.name,
+                duration: action.duration,
+                id: action.id,
+                rms: action.rms,
+            };
+            break;
 
         case "SET_TRANSPORT_TIME":
-            return produce(state, newState => {
-                newState.transport.currentTime = action.time;
-            });
+            state.transport.currentTime = action.time;
+            break;
 
         case "PLAYBACK_STARTED":
-            return produce(state, newState => {
-                newState.transport.playing = true;
-            });
+            state.transport.playing = true;
+            break;
 
         case "PLAYBACK_STOPPED":
-            return produce(state, newState => {
-                newState.transport.playing = false;
-            });
+            state.transport.playing = false;
+            break;
 
         case "RECORDING_STARTED":
-            return produce(state, newState => {
-                newState.transport.recording = true;
-            });
+            state.transport.recording = true;
+            break;
 
         case "RECORDING_STOPPED":
-            return produce(state, newState => {
-                newState.transport.recording = false;
-            });
+            state.transport.recording = false;
+            break;
 
         case "LAYER_ADDED":
-            return produce(state, newState => {
-                newState.layers.push({
-                    startTime: action.startTime,
-                    duration: action.duration,
-                    id: action.id,
-                    name: action.name,
-                    rms: action.rms,
-                });
+            state.layers.push({
+                startTime: action.startTime,
+                duration: action.duration,
+                id: action.id,
+                name: action.name,
+                rms: action.rms,
             });
+            break;
 
         case "LAYER_DELETED":
-            return produce(state, newState => {
-                newState.layers = newState.layers.filter(layer => layer.id !== action.id);
-            });
-
-        default:
-            return state;
+            state.layers = newState.layers.filter(layer => layer.id !== action.id);
+            break;
     }
-};
+}, initialState);
 
 export const history = createBrowserHistory({basename: "/"});
 

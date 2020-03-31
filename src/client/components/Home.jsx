@@ -54,7 +54,7 @@ let Home = ({dispatch, backingTrack, transportTime, layers}) => {
         </ButtonGroup>
         <Divider/>
         <ButtonGroup color="primary" variant="contained">
-            <Button onClick={() => dispatch(loadBackingTrack("/stand-by-me.mp3"))}>Load backing track</Button>
+            <Button onClick={() => dispatch(loadBackingTrack("/stand-by-me.mp3", true))}>Load backing track</Button>
             <Button onClick={() => dispatch(play(transportTime))}>Play</Button>
             <Button onClick={() => dispatch(stop())}>Stop</Button>
             <Button onClick={() => dispatch(setTransportTime(0))}>Rewind</Button>

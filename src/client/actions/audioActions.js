@@ -10,8 +10,15 @@ export const reset = () => async dispatch => {
     dispatch({type: "RESET"});
 };
 
-export const loadBackingTrack = url => async dispatch => {
-    dispatch({type:"ws/loadBackingTrack", url});
+export const loadBackingTrack = (url, broadcast=false) => async dispatch => {
+
+    if (broadcast) {
+        dispatch({
+            type:"ws/call",
+            fn: "selectBackingTrack",
+            kwargs: {url},
+        });
+    }
     await dispatch({type:"audio/init"});
 
     let {duration, rms} = await dispatch({

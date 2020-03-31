@@ -8,6 +8,7 @@ import { setConfig } from 'react-hot-loader';
 import Home from "./Home";
 import {blue, green, orange, red} from "@material-ui/core/colors";
 import {CssBaseline} from "@material-ui/core";
+import AppRouter from "./AppRouter";
 
 setConfig({
     reloadHooks: true,
@@ -30,6 +31,7 @@ let App = ({dispatch}) => {
                 <CssBaseline/>
                 <Home/>
             </ThemeProvider>
+            <AppRouter/>
         </Router>
     </Provider>;
 };
