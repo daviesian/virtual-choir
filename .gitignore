@@ -2,3 +2,4 @@
 /node_modules
 /static/*.mp3
 /.idea
+.layers

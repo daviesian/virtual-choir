@@ -31,7 +31,7 @@ let Transport = ({backingTrack, tracks=[], transportTime, dispatch}) => {
     return <div className={classes.root}>
         <List className={classes.trackList}>
             <Track {...backingTrack}/>
-            {tracks.map(t => <Track key={t.id} startTimePercent={100*t.startTime / backingTrack.duration} durationPercent={100*t.duration / backingTrack.duration} {...t}/>)}
+            {tracks.map(t => <Track key={t.id} enabled={t.enabled} startTime={t.startTime} duration={t.duration} startTimePercent={100*t.startTime / backingTrack.duration} durationPercent={100*t.duration / backingTrack.duration} {...t}/>)}
             {transportTime!==null && <TransportCursor timePercent={100*transportTime / backingTrack.duration}/>}
         </List>
     </div>

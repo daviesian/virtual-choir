@@ -64,6 +64,7 @@
     "node-sass": "4.13.1",
     "node-wav-player": "^0.1.0",
     "normalize.css": "^8.0.1",
+    "notistack": "^0.9.10",
     "postcss-scss": "^2.0.0",
     "raw-loader": "4.0.0",
     "react": "^16.11.0",
@@ -87,6 +88,10 @@
     "webpack-dev-middleware": "latest",
     "webpack-dev-server": "^3.9.0",
     "webpack-hot-middleware": "^2.25.0",
-    "webpack-node-externals": "^1.7.2"
+    "webpack-node-externals": "^1.7.2",
+    "uuid": "latest"
+  },
+  "dependencies": {
+    "regenerator-runtime": "latest"
   }
 }

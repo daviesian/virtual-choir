@@ -1,6 +1,8 @@
 import recorder from '!!raw-loader!babel-loader!./recorder.js';
-import {addLayer, setTransportTime} from "./actions/audioActions";
+import calibrator from '!!raw-loader!babel-loader!./calibrator.js';
+import {recordingFinished, setTransportTime, stopCalibration} from "./actions/audioActions";
 import {getAudioBufferRMSImageURL} from "./util";
+import { v4 as uuid } from 'uuid';
 
 export default store => next => {
 
@@ -13,10 +15,11 @@ export default store => next => {
     let transportStartTime = null;
     let backingTrackSourceNode = null;
     let recorderNode = null;
+    let calibratorNode = null;
     let layers = [];
 
     let transportTimeCallbacks = [];
-    let nextLayerId = 0;
+    const SAMPLE_RATE = 44100;
 
 
     const createAudioWorkletNode = async (name, sourceCode, options) => {
@@ -38,7 +41,7 @@ export default store => next => {
     let scheduleUpcomingLayers = () => {
         for (let layer of layers) {
             const LOOKAHEAD = 1;
-            if (!layer.sourceNode && layer.startTime >= context.currentTime - transportStartTime - 0.001 && layer.startTime < context.currentTime - transportStartTime + LOOKAHEAD) {
+            if (!layer.sourceNode && layer.enabled && layer.startTime >= context.currentTime - transportStartTime - 0.001 && layer.startTime < context.currentTime - transportStartTime + LOOKAHEAD) {
                 log.info("Scheduling layer", layer);
                 layer.sourceNode = context.createBufferSource();
                 layer.sourceNode.buffer = layer.buffer;
@@ -48,19 +51,37 @@ export default store => next => {
         }
     };
 
-    let init = async () => {
-        if (context)
-            return;
+    let close = async () => {
+        if (context) {
+            context.close();
+            for (let t of micStream.getTracks()) {
+                t.stop();
+            }
+            context = null;
+        }
+    };
 
-        context = new AudioContext();
+    let init = async () => {
+        await close();
+
+        context = new AudioContext({sampleRate: SAMPLE_RATE});
+        if (context.sampleRate !== SAMPLE_RATE) {
+            throw new Error("Could not initialise audio context with correct sample rate.");
+        }
 
         micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         micStreamSourceNode = context.createMediaStreamSource(micStream);
 
+        let latencySeconds = 0.19;
+        try {
+            latencySeconds = parseFloat(localStorage['latencySeconds']);
+            log.info(`Loaded latency calibration of ${Math.round(latencySeconds*1000)} ms.`)
+        } catch (e) {}
+
         recorderNode = await createAudioWorkletNode('recorder', recorder, {
             numberOfOutputs: 0,
             processorOptions: {
-                latencySeconds: 0.19,
+                latencySeconds,
             }
         });
 
@@ -68,7 +89,7 @@ export default store => next => {
             switch(data.type) {
                 case "RECORDED_DATA":
                     log.info("FROM RECORDER:", data);
-                    store.dispatch(addLayer(data.audioData, data.startTime))
+                    store.dispatch(recordingFinished(uuid(), data.audioData, data.startTime))
                     break;
                 case "LOG":
                     log.info("RECORDER:", ...data.messages);
@@ -76,7 +97,57 @@ export default store => next => {
             }
         };
 
+        calibratorNode = await createAudioWorkletNode('calibrator', calibrator, {
+            numberOfOutputs: 1,
+            processorOptions: {
+                tickPeriod: 1.5,
+            }
+        });
+
+        calibratorNode.port.onmessage = ({data}) => {
+            switch(data.type) {
+                case "QUIET_CALIBRATION_START":
+                    dispatch({
+                        type: "CALIBRATION",
+                        calibrationType: 'quiet',
+                    });
+                    break;
+                case "QUIET_CALIBRATION_END":
+                    dispatch({
+                        type: "CALIBRATION",
+                        calibrationType: 'latency',
+                    });
+                    break;
+                case "CALIBRATION":
+                    log.info(`Got latency calibration: ${data.latency.toPrecision(3)} seconds`)
+                    try {
+                        localStorage['latencySeconds'] = data.latency;
+                    } catch (e) {log.info("Could not save calibration data to local storage")}
+                    recorderNode.call("setLatency", data.latency);
+                    dispatch({
+                        type: "CALIBRATION",
+                        calibration: data,
+                        calibrationType: null,
+                    });
+                    calibratorNode.parameters.get("enabled").value = 0;
+
+                    break;
+                case "LOG":
+                    log.info("CALIBRATOR:", ...data.messages);
+                    break;
+            }
+        };
+
+        let tickWav = await(await fetch("/hi-clave.wav")).arrayBuffer();
+        let tockWav = await(await fetch("/lo-clave.wav")).arrayBuffer();
+        let tickAudioBuffer = await context.decodeAudioData(tickWav);
+        let tockAudioBuffer = await context.decodeAudioData(tockWav);
+
+        calibratorNode.call("setTickBuffers", tickAudioBuffer.getChannelData(0), tockAudioBuffer.getChannelData(0), 0.01, 0.01);
+
         micStreamSourceNode.connect(recorderNode);
+        micStreamSourceNode.connect(calibratorNode);
+        calibratorNode.connect(context.destination);
 
         requestAnimationFrame(function onAnimationFrame() {
 
@@ -109,16 +180,6 @@ export default store => next => {
         });
     };
 
-    let close = async () => {
-        if (context) {
-            context.close();
-            for (let t of micStream.getTracks()) {
-                t.stop();
-            }
-            context = null;
-        }
-    };
-
     let play = startTime => {
         backingTrackSourceNode = context.createBufferSource();
         backingTrackSourceNode.buffer = backingTrackAudioBuffer;
@@ -138,8 +199,10 @@ export default store => next => {
                 layer.sourceNode = null;
             }
         }
-        backingTrackSourceNode.stop();
-        backingTrackSourceNode.disconnect();
+        if (backingTrackSourceNode) {
+            backingTrackSourceNode.stop();
+            backingTrackSourceNode.disconnect();
+        }
         transportStartTime = null;
     };
 
@@ -156,6 +219,27 @@ export default store => next => {
         if (action.type.startsWith("audio/")) {
             switch (action.type.substr(6)) {
 
+                case "initDevices":
+                    let m = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                    let mapDeviceToUsefulObject = device => ({
+                        id: device.deviceId,
+                        name: device.label || device.deviceId.substring(0,6),
+                    });
+                    let inputs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput').map(mapDeviceToUsefulObject);
+                    let outputs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audiooutput').map(mapDeviceToUsefulObject);
+
+                    dispatch({
+                        type: "INIT_AUDIO_DEVICES",
+                        inputs,
+                        outputs,
+                    });
+
+                    for (let t of m.getAudioTracks()) {
+                        t.stop();
+                    }
+                    return;
+
                 case "init":
                     return await init();
 
@@ -170,6 +254,16 @@ export default store => next => {
                     recorderNode = null;
                     layers = [];
 
+                    break;
+
+                case "startCalibration":
+                    await init();
+                    calibratorNode.parameters.get("enabled").value = 1;
+                    break;
+
+                case "stopCalibration":
+                    await init();
+                    calibratorNode.parameters.get("enabled").value = 0;
                     break;
 
                 case "loadBackingTrack":
@@ -218,11 +312,11 @@ export default store => next => {
 
                 case "stopRecording":
                     if (recorderNode.parameters.get("recording").value !== 1) {
-                        dispatch({
-                            type: "TOAST",
-                            level: "warn",
-                            message: "Cannot stop recording - recording not started",
-                        });
+                        // dispatch({
+                        //     type: "TOAST",
+                        //     level: "warn",
+                        //     message: "Cannot stop recording - recording not started",
+                        // });
                         return false;
                     }
                     await stopRecord();
@@ -234,13 +328,24 @@ export default store => next => {
                     layers.push({
                         buffer: audioBuffer,
                         startTime: action.startTime,
-                        id: nextLayerId,
+                        id: action.id,
+                        enabled: action.enabled,
                     });
                     return {
                         duration: audioBuffer.duration,
-                        id: nextLayerId++,
+                        id: action.id,
                         rms: await getAudioBufferRMSImageURL(audioBuffer, audioBuffer.duration*20),
                     };
+
+                case "toggleLayer": {
+                    let layer = layers.find(({id}) => id === action.id);
+                    if (layer) {
+                        layer.enabled = action.enabled;
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
 
                 case "deleteLayer":
                     layers = layers.filter(layer => layer.id !== action.id);

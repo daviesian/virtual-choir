@@ -1,6 +1,19 @@
 import RSVP from "rsvp";
 import log from 'loglevel';
-import {loadBackingTrack} from "./actions/audioActions";
+import {
+    deleteLayer,
+    loadBackingTrack,
+    loadSingerLayer,
+    play, seek,
+    setTransportTime,
+    startRecording,
+    stop,
+    stopRecording, toggleLayer
+} from "./actions/audioActions";
+import {sendProgress, updateSingerState} from "./actions";
+
+const BINARY_CHUNK_SIZE = 64000000000000;
+
 
 export default store => next => {
 
@@ -10,8 +23,35 @@ export default store => next => {
     let nextCallId = 0;
 
     let commandHandlers = {
-        selectBackingTrack: ({url}) => {
+        loadBackingTrack: ({url}) => {
             store.dispatch(loadBackingTrack(url));
+        },
+        play: ({startTime}) => {
+            store.dispatch(play(startTime));
+        },
+        stop: () => {
+            store.dispatch(stop());
+        },
+        startRecording: () => {
+            store.dispatch(startRecording());
+        },
+        stopRecording: () => {
+            store.dispatch(stopRecording());
+        },
+        seek: ({time}) => {
+            store.dispatch(seek(time));
+        },
+        updateSingerState: ({singer, state}) => {
+            store.dispatch(updateSingerState(singer, state));
+        },
+        newSingerLayer: ({singer, id, startTime}) => {
+            store.dispatch(loadSingerLayer(id, startTime));
+        },
+        toggleLayer: ({id, startTime, enabled}) => {
+            store.dispatch(toggleLayer(id, startTime, enabled));
+        },
+        deleteLayer: ({id}) => {
+            store.dispatch(deleteLayer(id));
         }
     };
 
@@ -36,41 +76,64 @@ export default store => next => {
     };
 
     let initWs = () => {
-        let socket = new WebSocket(document.location.protocol.replace("http", "ws") + "//" + document.location.host + "/ws");
+        if (window.socket) {
+            window.socket.close();
+        }
+        window.socket = new WebSocket(document.location.protocol.replace("http", "ws") + "//" + document.location.host + "/ws");
         log.info("Websocket connecting...");
 
-        socket.onopen = () => {
+        window.socket.onopen = () => {
             log.info("Websocket connected");
-            ws.resolve(socket);
+            ws.binaryType = 'arrayBuffer';
+            ws.resolve(window.socket);
         };
 
-        socket.onclose = () => {
+        window.socket.onclose = () => {
+            window.socket = null;
             ws.reject("Websocket closed");
             ws = RSVP.defer();
-            initWs();
+            setTimeout(initWs, 1000);
         };
 
-        socket.onerror = (e) => {
+        window.socket.onerror = (e) => {
             log.error(e);
-            socket.close();
+            window.socket.close();
         };
 
-        socket.onmessage = receiveIncomingMessage;
+        window.socket.onmessage = receiveIncomingMessage;
     };
 
-    initWs();
+    if (!window.socket) {
+        initWs();
+    }
 
     let sendJSON = async obj => {
         (await ws.promise).send(JSON.stringify(obj));
     };
 
-    let call = async (fn, kwargs={}) => {
+    // Data is a TypedArray
+    let sendBinary = async (callId, data) => {
+        let w = await ws.promise;
+        for (let i = 0; i < data.buffer.byteLength; i += BINARY_CHUNK_SIZE) {
+            let chunkLength = Math.min(BINARY_CHUNK_SIZE, data.buffer.byteLength - i)
+            w.send(new Uint8Array(data.buffer, i, chunkLength));
+            await new Promise(r => setTimeout(r,100));
+            store.dispatch(sendProgress(callId, i+chunkLength, data.buffer.byteLength));
+        }
+    };
+
+    let call = async (fn, kwargs={}, data=null) => {
         let callId = nextCallId++;
         outstandingCalls[callId] = RSVP.defer();
-        await sendJSON({fn, kwargs, callId});
+        let responsePromise = outstandingCalls[callId].promise;
+
+        await sendJSON({fn, kwargs, callId, binaryDataToFollow: data?.buffer.byteLength});
+        if (data) {
+            await sendBinary(callId, data);
+        }
 
         try {
-            return await outstandingCalls[callId].promise;
+            return await responsePromise;
         } catch (e) {
             throw new Error(e);
         }
@@ -81,9 +144,7 @@ export default store => next => {
         if (action.type.startsWith("ws/")) {
             switch (action.type.substr(3)) {
                 case "call":
-                    return await call(action.fn, action.kwargs);
-                    break;
-
+                    return await call(action.fn, action.kwargs, action.data);
             }
         } else {
             return next(action);

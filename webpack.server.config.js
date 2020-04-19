@@ -3,6 +3,7 @@ const webpack = require("webpack");
 const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 const nodeExternals = require('webpack-node-externals');
 
+
 let context = path.resolve('./src');
 
 module.exports = {

@@ -16,7 +16,7 @@ class Recorder extends AudioWorkletProcessor {
 
         this.startTimeOffset = 0;
 
-        this.latencyBufferCount = Math.round(latencySeconds * sampleRate / 128);
+        this.setLatency(latencySeconds);
         this.remainingLatencyBuffersToCapture = null;
 
         this.port.onmessage = ({data}) => {
@@ -38,6 +38,10 @@ class Recorder extends AudioWorkletProcessor {
 
     setStartTimeOffset(offset) {
         this.startTimeOffset = offset;
+    }
+
+    setLatency(seconds) {
+        this.latencyBufferCount = Math.round(seconds * sampleRate / 128);
     }
 
     process (inputs, outputs, {recording: [recording]}) {

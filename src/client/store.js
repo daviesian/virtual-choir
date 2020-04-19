@@ -19,7 +19,10 @@ const initialState = {
         currentTime: 0,
         playing: false,
         recording: false,
-    }
+    },
+    conducting: false,
+    sending: {},
+    calibration: null,
 };
 
 let rootReducer = produce((state, action) => {
@@ -28,12 +31,46 @@ let rootReducer = produce((state, action) => {
 
     switch (action.type) {
 
+        case "SET_CONDUCTING":
+            state.conducting = action.conducting;
+            break;
+
+        case "INIT_AUDIO_DEVICES":
+            state.devices = {
+                inputs: action.inputs,
+                outputs: action.outputs,
+            };
+            break;
+
+        case "SELECTED_INPUT_DEVICE":
+            state.devices.inputId = action.id;
+            break;
+
+        case "SELECTED_OUTPUT_DEVICE":
+            state.devices.outputId = action.id;
+            break;
+
         case "INIT_DONE":
             state.audioInitialised = true;
             break;
 
         case "RESET":
             return initialState;
+
+        case "CALIBRATION":
+            state.calibration = state.calibration || {};
+            if (action.calibrationType) {
+                state.calibration.type = action.calibrationType;
+            }
+            if (action.calibration) {
+                delete state.calibration.type;
+                state.calibration.calibration = action.calibration;
+            }
+            break;
+
+        case "CALIBRATION_DONE":
+            delete state.calibration;
+            return;
 
         case "BACKING_TRACK_LOADED":
             state.backingTrack = {
@@ -71,11 +108,32 @@ let rootReducer = produce((state, action) => {
                 id: action.id,
                 name: action.name,
                 rms: action.rms,
+                enabled: action.enabled,
             });
             break;
 
+        case "LAYER_TOGGLE": {
+            let layer = state.layers.find(({id}) => id === action.id)
+            if (layer) {
+                layer.enabled = action.enabled;
+            } else {
+                throw new Error(`Cannot enable non-existent layer: ${action.id}`);
+            }
+            break;
+        }
+
         case "LAYER_DELETED":
-            state.layers = newState.layers.filter(layer => layer.id !== action.id);
+            state.layers = state.layers.filter(layer => layer.id !== action.id);
+            break;
+
+        case "SEND_PROGRESS":
+            state.sending[action.transferId] = {
+                sentBytes: action.sentBytes,
+                totalBytes: action.totalBytes,
+            };
+            break;
+        case "SEND_PROGRESS_DONE":
+            delete state.sending[action.transferId];
             break;
     }
 }, initialState);
