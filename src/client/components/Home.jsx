@@ -2,7 +2,6 @@ import * as React from 'react';
 import {connect} from "react-redux";
 import {useState} from "react";
 import {
-    loadBackingTrack,
     play,
     stop,
     startRecording,
@@ -23,7 +22,7 @@ import Paper from "@material-ui/core/Paper";
 import Card from "@material-ui/core/Card";
 import Transport from "./Transport";
 import {Switch} from "@material-ui/core";
-import {setConducting} from "../actions";
+import {loadBackingTrack, setConducting} from "../actions";
 import LinearProgress from "@material-ui/core/LinearProgress";
 import Dialog from "@material-ui/core/Dialog";
 import DialogTitle from "@material-ui/core/DialogTitle";
@@ -72,10 +71,10 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending}
         </div>
         <Divider/>
         <ButtonGroup color="primary" variant="contained">
-            <Button onClick={() => dispatch(loadBackingTrack("/let-it-go.mp3", conducting))}>Load backing track</Button>
+            <Button onClick={() => dispatch(loadBackingTrack({id: "let-it-go", name: "Let It Go", url:"/let-it-go.mp3"}, conducting))}>Load backing track</Button>
             <Button onClick={() => dispatch(play(transportTime, true, conducting))}>Play</Button>
             <Button onClick={() => dispatch(stop(true, conducting))}>Stop</Button>
-            <Button onClick={() => dispatch(seek(0))}>Rewind</Button>
+            <Button onClick={() => dispatch(seek(0, conducting))}>Rewind</Button>
             <Button onClick={() => dispatch(startRecording(true, conducting))}>Start Recorder</Button>
             <Button onClick={() => dispatch(stopRecording(true, conducting))}>Stop Recorder</Button>
         </ButtonGroup>

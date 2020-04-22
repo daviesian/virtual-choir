@@ -23,12 +23,7 @@ const initialState = {
     conducting: false,
     sending: {},
     calibration: null,
-    devices: {
-        inputs: [],
-        outputs: [],
-        selectedInputId: null,
-        selectedOutputId: null,
-    },
+    devices: null,
 };
 
 let rootReducer = produce((state, action) => {
@@ -92,7 +87,8 @@ let rootReducer = produce((state, action) => {
                 name: action.name,
                 duration: action.duration,
                 id: action.id,
-                rms: action.rms,
+                url: action.url,
+                rms: action.rms
             };
             break;
 
@@ -131,12 +127,13 @@ let rootReducer = produce((state, action) => {
             });
             break;
 
-        case "LAYER_TOGGLE": {
-            let layer = state.layers.find(({id}) => id === action.id)
+        case "LAYER_UPDATE": {
+            let layer = state.layers.find(({id}) => id === action.layer.id)
+            // TODO: Allow updating more stuff
             if (layer) {
-                layer.enabled = action.enabled;
+                layer.enabled = action.layer.enabled;
             } else {
-                throw new Error(`Cannot enable non-existent layer: ${action.id}`);
+                throw new Error(`Cannot enable non-existent layer: ${action.layer.id}`);
             }
             break;
         }

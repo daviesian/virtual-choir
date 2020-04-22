@@ -1,3 +1,4 @@
+import {loadSingerLayer} from "./audioActions";
 
 export const toast = (message, level='info') => ({
     type: "TOAST",
@@ -5,11 +6,32 @@ export const toast = (message, level='info') => ({
     message,
 });
 
-export const requestJoinRoom = (room) => ({
-    type: "ws/call",
-    fn: "joinRoom",
-    kwargs: { room },
-});
+export const requestJoinRoom = (room) => async (dispatch) => {
+    let dbRoom = await dispatch({
+        type: "ws/call",
+        fn: "joinRoom",
+        kwargs: { room },
+    });
+
+    log.info(`Joined room '${room}':`, dbRoom);
+    if (dbRoom?.currentBackingTrackId) {
+        let backingTrack = await dispatch({
+            type: "ws/call",
+            fn: "getBackingTrack",
+            kwargs: { id: dbRoom.currentBackingTrackId },
+        });
+        await dispatch(loadBackingTrack(backingTrack, false));
+
+        let layers = await dispatch({
+            type: "ws/call",
+            fn: "getLayers",
+            kwargs: { roomId: room, backingTrackId: dbRoom.currentBackingTrackId },
+        });
+        for (let layer of layers) {
+            await dispatch(loadSingerLayer(layer))
+        }
+    }
+};
 
 export const requestLeaveRoom = () => ({
     type: "ws/call",
@@ -64,3 +86,28 @@ export const sendProgress = (transferId, sentBytes, totalBytes) => (dispatch, ge
 };
 
 
+export const loadBackingTrack = ({id, name, url}, conduct = false) => async dispatch => {
+
+    if (conduct) {
+        dispatch({
+            type: "ws/call",
+            fn: "loadBackingTrack",
+            kwargs: {id},
+        });
+    }
+
+    let {duration, rms} = await dispatch({
+        type: "audio/loadBackingTrack",
+        url,
+    });
+
+    dispatch({
+        type: "BACKING_TRACK_LOADED",
+        id,
+        name,
+        url,
+        duration,
+        rms,
+    })
+
+};

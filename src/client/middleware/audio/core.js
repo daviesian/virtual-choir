@@ -5,6 +5,7 @@ import {recordingFinished, setTransportTime} from "../../actions/audioActions";
 import {v4 as uuid} from "uuid";
 import {createAudioWorkletNode} from "./util";
 import s from "./state";
+import {getAudioBufferRMSImageURL} from "../../util";
 
 const SAMPLE_RATE = 44100;
 
@@ -112,6 +113,7 @@ const getLatency = (inputId, outputId) => {
 
 
 export const init = async (inputId, outputId, dispatch) => {
+
     if (s.context) {
         return;
     }
@@ -251,6 +253,16 @@ export const init = async (inputId, outputId, dispatch) => {
     });
 };
 
+export const loadBackingTrack = async (url) => {
+    let buffer = await (await fetch(url)).arrayBuffer();
+    s.backingTrackAudioBuffer = await s.context.decodeAudioData(buffer);
+
+    return {
+        duration: s.backingTrackAudioBuffer.duration,
+        rms: await getAudioBufferRMSImageURL(s.backingTrackAudioBuffer, s.backingTrackAudioBuffer.duration * 20),
+    };
+};
+
 export const play = startTime => {
     s.backingTrackSourceNode = s.context.createBufferSource();
     s.backingTrackSourceNode.buffer = s.backingTrackAudioBuffer;
@@ -301,3 +313,22 @@ export const record = () => {
 export const stopRecord = () => {
     s.recorderNode.parameters.get("recording").value = 0;
 };
+
+export const addLayer = async (id, startTime, enabled=false, audioData=null) => {
+    audioData = audioData || new Float32Array(await (await fetch(`/.layers/${id}.raw`)).arrayBuffer());
+
+    let audioBuffer = s.context.createBuffer(1, audioData.length, s.context.sampleRate);
+    audioBuffer.copyToChannel(audioData, 0, 0);
+    s.layers.push({
+        buffer: audioBuffer,
+        startTime: startTime,
+        id: id,
+        enabled: enabled,
+    });
+    return {
+        duration: audioBuffer.duration,
+        id: id,
+        rms: await getAudioBufferRMSImageURL(audioBuffer, audioBuffer.duration * 20),
+    };
+
+}

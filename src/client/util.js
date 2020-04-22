@@ -24,4 +24,3 @@ export const getAudioBufferRMSImageURL = async (audioBuffer, imgWidth, imgHeight
 
     return URL.createObjectURL(blob);
 };
-

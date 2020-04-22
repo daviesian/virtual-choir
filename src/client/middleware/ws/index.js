@@ -2,14 +2,13 @@ import RSVP from "rsvp";
 import log from 'loglevel';
 import {
     deleteLayer,
-    loadBackingTrack,
     loadSingerLayer,
     play, seek,
     startRecording,
     stop,
-    stopRecording, toggleLayer
+    stopRecording, updateLayer,
 } from "../../actions/audioActions";
-import {sendProgress, updateSingerState} from "../../actions";
+import {loadBackingTrack, sendProgress, updateSingerState} from "../../actions";
 
 const BINARY_CHUNK_SIZE = 8000;
 
@@ -21,8 +20,8 @@ export default store => next => {
     let nextCallId = 0;
 
     let commandHandlers = {
-        loadBackingTrack: ({url}) => {
-            store.dispatch(loadBackingTrack(url));
+        loadBackingTrack: ({track}) => {
+            store.dispatch(loadBackingTrack(track));
         },
         play: ({startTime}) => {
             store.dispatch(play(startTime));
@@ -42,11 +41,11 @@ export default store => next => {
         updateSingerState: ({singer, state}) => {
             store.dispatch(updateSingerState(singer, state));
         },
-        newSingerLayer: ({singer, id, startTime}) => {
-            store.dispatch(loadSingerLayer(id, startTime));
+        newSingerLayer: ({layer}) => {
+            store.dispatch(loadSingerLayer(layer));
         },
-        toggleLayer: ({id, startTime, enabled}) => {
-            store.dispatch(toggleLayer(id, startTime, enabled));
+        updateLayer: ({layer}) => {
+            store.dispatch(updateLayer(layer));
         },
         deleteLayer: ({id}) => {
             store.dispatch(deleteLayer(id));

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "node --experimental-repl-await dist/server.js",
     "watch": "webpack --mode development --watch --config webpack.server.config.js",
     "build": "webpack --mode production",
     "build-client-dev": "webpack --mode development --config webpack.client.config.js",
@@ -79,18 +79,21 @@
     "reselect": "latest",
     "rsvp": "4.8.5",
     "sass-loader": "^8.0.0",
+    "source-map-loader": "0.2.4",
+    "sql-template-strings": "^2.2.2",
+    "sqlite": "4.0.7",
+    "sqlite3": "4.1.1",
     "style-loader": "^1.0.0",
     "ts-loader": "^6.2.1",
     "typescript": "^3.7.1-rc",
+    "uuid": "latest",
     "webpack": "^4.41.2",
     "webpack-bundle-analyzer": "^3.6.0",
     "webpack-cli": "^3.3.9",
     "webpack-dev-middleware": "latest",
     "webpack-dev-server": "^3.9.0",
     "webpack-hot-middleware": "^2.25.0",
-    "webpack-node-externals": "^1.7.2",
-    "uuid": "latest",
-    "source-map-loader": "0.2.4"
+    "webpack-node-externals": "^1.7.2"
   },
   "dependencies": {
     "regenerator-runtime": "latest"

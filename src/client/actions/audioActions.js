@@ -45,77 +45,49 @@ export const stopCalibration = () => async dispatch => {
     });
 };
 
-export const loadBackingTrack = (url, conduct=false) => async dispatch => {
-
-    if (conduct) {
-        dispatch({
-            type:"ws/call",
-            fn: "loadBackingTrack",
-            kwargs: {url},
-        });
-    }
-    await dispatch({type:"audio/init"});
-
-    let {duration, rms} = await dispatch({
-        type: "audio/loadBackingTrack",
-        arrayBuffer: await (await fetch(url)).arrayBuffer(),
-    });
-
-    dispatch({
-        type: "BACKING_TRACK_LOADED",
-        name: url,
-        duration,
-        rms,
-    })
-
-};
-
-export const loadSingerLayer = (id, startTime) => async (dispatch, getState) => {
-    let audioData = new Float32Array(await (await fetch(`/.layers/${id}.raw`)).arrayBuffer());
+export const loadSingerLayer = (layer) => async (dispatch, getState) => {
 
     let addedLayer = await dispatch({
         type: "audio/addLayer",
-        audioData,
-        startTime,
-        id,
+        ...layer,
     });
 
     dispatch({
         type: "LAYER_ADDED",
-        startTime: startTime,
+        startTime: layer.startTime,
         duration: addedLayer.duration,
-        id,
+        id: layer.id,
         rms: addedLayer.rms,
-        name: "/.layers/" + addedLayer.id, // TODO: Use a nicer name. Username, for example.
+        name: "/.layers/" + layer.id, // TODO: Use a nicer name. Username, for example.
+        enabled: layer.enabled,
     });
 
 };
 
-export const toggleLayer = (id, startTime, enabled, them=false) => async (dispatch, getState) => {
+export const updateLayer = (layer, them=false) => async (dispatch, getState) => {
 
     if (them) {
         dispatch({
             type: "ws/call",
-            fn: "toggleLayer",
-            kwargs: { id, startTime, enabled },
+            fn: "updateLayer",
+            kwargs: { layer },
         });
     }
 
     let state = getState();
-    if (enabled && !state.layers.find((l) => l.id === id)) {
-        await dispatch(loadSingerLayer(id, startTime));
+    if (layer.enabled && !state.layers.find((l) => l.id === layer.id)) {
+        await dispatch(loadSingerLayer(layer));
     }
 
     dispatch({
-        type: "audio/toggleLayer",
-        id: id,
-        enabled,
+        type: "audio/enableLayer",
+        id: layer.id,
+        enabled: layer.enabled,
     });
 
     dispatch({
-        type: "LAYER_TOGGLE",
-        id,
-        enabled,
+        type: "LAYER_UPDATE",
+        layer,
     });
 
     if (!getState().conducting) {
@@ -199,7 +171,7 @@ export const startRecording = (me=true, them=false) => async (dispatch, getState
 
 };
 
-export const stopRecording = (me=true, them=true) => async (dispatch, getState) => {
+export const stopRecording = (me=true, them=false) => async (dispatch, getState) => {
 
     if (them) {
         dispatch({
@@ -237,7 +209,7 @@ export const recordingFinished = (id, audioData, startTime) => async (dispatch, 
         duration: addedLayer.duration,
         id,
         rms: addedLayer.rms,
-        name: "Layer " + addedLayer.id, // TODO: Use a nicer name. Username, for example.
+        name: "Layer " + id, // TODO: Use a nicer name. Username, for example.
         conductor: true,
         enabled: false,
     });
@@ -245,7 +217,7 @@ export const recordingFinished = (id, audioData, startTime) => async (dispatch, 
     await dispatch({
         type: "ws/call",
         fn: "newLayer",
-        kwargs: { id, startTime },
+        kwargs: { id, startTime, backingTrackId: getState().backingTrack.id },
         data: audioData,
     });
 };

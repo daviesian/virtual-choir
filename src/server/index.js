@@ -1,4 +1,15 @@
 require("regenerator-runtime");
+
+import {
+    deleteLayer,
+    ensureRoomExists,
+    getBackingTrack,
+    openDB,
+    saveLayer,
+    setRoomBackingTrack,
+    updateLayer
+} from "./data";
+import * as db from "./data"
 const express = require("express");
 const app = express();
 require('express-ws')(app);
@@ -6,6 +17,7 @@ const path = require("path");
 const log = require("loglevel");
 const fs = require("fs");
 const root = path.resolve("./src");
+const repl = require('repl');
 
 const webpack = require("webpack");
 const webpackConfig = require("../../webpack.client.config");
@@ -69,9 +81,11 @@ let sendToRoomConductor = (room, obj) => {
 };
 
 let messageHandlers = {
-    joinRoom: (client, {room}) => {
+    joinRoom: async (client, {room}) => {
         client.room = room;
+        let dbRoom = await ensureRoomExists(room);
         clientLog(client, `Joined room '${room}'`);
+        return dbRoom;
     },
     leaveRoom: (client) => {
         if (client.room) {
@@ -91,10 +105,14 @@ let messageHandlers = {
         }
         return true;
     },
-    loadBackingTrack: (client, {url}) => {
+    getBackingTrack: async (client, {id}) => {
+        return await getBackingTrack(id);
+    },
+    loadBackingTrack: async (client, {id}) => {
         requireConductor(client);
-        roomLog(client.room, `Loading ${url}`);
-        conduct(client.room, {cmd: "loadBackingTrack", url});
+        roomLog(client.room, `Loading backing track '${id}'`);
+        let track = await setRoomBackingTrack(client.room, id);
+        conduct(client.room, {cmd: "loadBackingTrack", track});
     },
     play: (client, {startTime}) => {
         requireConductor(client);
@@ -125,22 +143,29 @@ let messageHandlers = {
         client.singerState = state;
         sendToRoomConductor(client.room, {cmd: "updateSingerState", singer: client.id, state});
     },
-    newLayer: (client, { id, startTime }, audioData) => {
+    newLayer: async (client, { id, startTime, backingTrackId }, audioData) => {
         requireUuid(id);
         clientLog(client, "New layer:", audioData.length);
         fs.mkdirSync(".layers", {recursive: true});
         fs.writeFileSync(`.layers/${id}.raw`, audioData);
+        let layer = await saveLayer(id, backingTrackId, client.room, startTime);
         if (!client.conducting) {
-            sendToRoomConductor(client.room, {cmd: "newSingerLayer", id, startTime});
+            sendToRoomConductor(client.room, {cmd: "newSingerLayer", layer});
         }
     },
-    toggleLayer: (client, {id, startTime, enabled}) => {
-        requireConductor(client);
-        conduct(client.room, {cmd: "toggleLayer", id, startTime, enabled});
+    getLayers: async (client, {roomId, backingTrackId}) => {
+        return await db.getLayers(roomId, backingTrackId);
     },
-    deleteLayer: (client, {id}) => {
+    updateLayer: async (client, {layer}) => {
+        requireConductor(client);
+        // TODO: Update more than just 'enabled'
+        let updatedLayer = await updateLayer(layer);
+        conduct(client.room, {cmd: "updateLayer", layer: updatedLayer});
+    },
+    deleteLayer: async (client, {id}) => {
         requireConductor(client);
         conduct(client.room, {cmd: "deleteLayer", id});
+        await deleteLayer(id);
     },
 };
 
@@ -177,7 +202,7 @@ let onClientMessage = async (client, msg) => {
             let f = messageHandlers[fn];
             if (!f)
                 throw new Error(`Server function not found: ${fn}`);
-            resp.response = f(client, kwargs, data);
+            resp.response = await f(client, kwargs, data);
         } catch (e) {
             resp.error = e.message;
         }
@@ -216,4 +241,17 @@ app.use("/.layers", express.static(".layers"));
 app.get(/.*/, (req, res) => res.sendFile(path.resolve(root, "../static/index.html")));
 
 // app start up
-app.listen(8080, "0.0.0.0", () => console.log("App listening on port 8080!"));
+(async () => {
+    await openDB();
+    app.listen(8080, "0.0.0.0", () => console.log("App listening on port 8080!"));
+})();
+
+let serverRepl = repl.start({
+    prompt: '> ',
+    useColors: true,
+    useGlobal: true,
+    ignoreUndefined: true,
+});
+
+serverRepl.context.clients = clients;
+serverRepl.context.db = db;
