@@ -89,7 +89,8 @@
     "webpack-dev-server": "^3.9.0",
     "webpack-hot-middleware": "^2.25.0",
     "webpack-node-externals": "^1.7.2",
-    "uuid": "latest"
+    "uuid": "latest",
+    "source-map-loader": "0.2.4"
   },
   "dependencies": {
     "regenerator-runtime": "latest"

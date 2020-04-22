@@ -2,8 +2,8 @@ import thunkMiddleware from 'redux-thunk'
 import {createLogger} from 'redux-logger'
 import {applyMiddleware, createStore} from 'redux'
 import {createBrowserHistory} from "history";
-import audioMiddleware from './audioMiddleware';
-import wsMiddleware from "./wsMiddleware";
+import audioMiddleware from './middleware/audio';
+import wsMiddleware from "./middleware/ws";
 import {produce} from "immer";
 
 const loggerMiddleware = createLogger({
@@ -23,6 +23,12 @@ const initialState = {
     conducting: false,
     sending: {},
     calibration: null,
+    devices: {
+        inputs: [],
+        outputs: [],
+        selectedInputId: null,
+        selectedOutputId: null,
+    },
 };
 
 let rootReducer = produce((state, action) => {
@@ -39,23 +45,26 @@ let rootReducer = produce((state, action) => {
             state.devices = {
                 inputs: action.inputs,
                 outputs: action.outputs,
+                selectedInputId: action.selectedInputId,
+                selectedOutputId: action.selectedOutputId,
             };
             break;
 
         case "SELECTED_INPUT_DEVICE":
-            state.devices.inputId = action.id;
+            state.devices.selectedInputId = action.id;
             break;
 
         case "SELECTED_OUTPUT_DEVICE":
-            state.devices.outputId = action.id;
+            state.devices.selectedOutputId = action.id;
             break;
 
         case "INIT_DONE":
             state.audioInitialised = true;
             break;
 
-        case "RESET":
-            return initialState;
+        case "RESET_AUDIO":
+            // TODO: Clear audio-related state.
+            return state;
 
         case "CALIBRATION":
             state.calibration = state.calibration || {};
@@ -65,6 +74,12 @@ let rootReducer = produce((state, action) => {
             if (action.calibration) {
                 delete state.calibration.type;
                 state.calibration.calibration = action.calibration;
+            }
+            if (action.sample) {
+                state.calibration.samples = state.calibration.samples || [];
+                state.calibration.samples.push(action.sample.latency);
+                state.calibration.mean = action.sample.mean;
+                state.calibration.sd = action.sample.sd;
             }
             break;
 
@@ -79,6 +94,10 @@ let rootReducer = produce((state, action) => {
                 id: action.id,
                 rms: action.rms,
             };
+            break;
+
+        case "SEEK":
+            state.transport.currentTime = action.time;
             break;
 
         case "SET_TRANSPORT_TIME":

@@ -1,8 +1,6 @@
 import * as React from 'react';
 import {connect} from "react-redux";
-//import "./Home.scss";
 import {useState} from "react";
-import {useEffect} from "react";
 import {
     loadBackingTrack,
     play,
@@ -12,7 +10,7 @@ import {
     deleteLayer,
     init,
     reset,
-    setTransportTime, startCalibration, stopCalibration
+    seek, startCalibration, stopCalibration
 } from "../actions/audioActions";
 import Layer from "./Layer";
 import {makeStyles} from "@material-ui/core/styles";
@@ -77,7 +75,7 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending}
             <Button onClick={() => dispatch(loadBackingTrack("/let-it-go.mp3", conducting))}>Load backing track</Button>
             <Button onClick={() => dispatch(play(transportTime, true, conducting))}>Play</Button>
             <Button onClick={() => dispatch(stop(true, conducting))}>Stop</Button>
-            <Button onClick={() => dispatch(setTransportTime(0))}>Rewind</Button>
+            <Button onClick={() => dispatch(seek(0))}>Rewind</Button>
             <Button onClick={() => dispatch(startRecording(true, conducting))}>Start Recorder</Button>
             <Button onClick={() => dispatch(stopRecording(true, conducting))}>Stop Recorder</Button>
         </ButtonGroup>

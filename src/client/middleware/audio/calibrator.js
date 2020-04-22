@@ -7,7 +7,7 @@ let out = (outputs, sampleIndex, val) => {
 
 class Calibrator extends AudioWorkletProcessor {
 
-    constructor({ processorOptions: { initialQuietPeriod=1, tickPeriod=1 , maxSD=0.02, minSamples=3} }) {
+    constructor({ processorOptions: { initialQuietPeriod=1, tickPeriod=1 , maxSD=0.03, minSamples=3} }) {
         super();
 
         this.tickBuffer = new Float32Array(tickPeriod * sampleRate);
@@ -76,6 +76,15 @@ class Calibrator extends AudioWorkletProcessor {
         sd /= this.samples.length;
 
         this.log(`Calibration of ${Math.round(mean*1000)} ms has SD of ${Math.round(sd*1000)} ms with ${this.samples.length} samples.`)
+
+        this.port.postMessage({
+            type: "SAMPLE",
+            sample: {
+                latency: this.samples[this.samples.length - 1],
+                sd,
+                mean,
+            },
+        });
 
         if (sd < this.maxSD && this.samples.length >= this.minSamples) {
             this.port.postMessage({
@@ -155,7 +164,7 @@ class Calibrator extends AudioWorkletProcessor {
                         if (previousTickFrame > this.lastClappedTickFrame) {
                             this.lastClappedTickFrame = previousTickFrame;
                             let latency = (currentFrame - previousTickFrame) / sampleRate;
-                            if (latency > 0.01 && latency < 0.5) { // Only accept latencies between 10 ms and 500 ms.
+                            if (latency > 0.01 && latency < 0.8) { // Only accept latencies between 10 ms and 500 ms.
                                 this.log(`Clap latency ${latency.toPrecision(3)} seconds. Volume ${v.toPrecision(3)} (${Math.round((v - this.initialQuiet.mean) / this.initialQuiet.sd)} SDs above mean, ${Math.round((v - this.initialQuiet.max) / this.initialQuiet.sd)} SDs above max)`);
                                 this.samples.push(latency);
                                 this.maybeEmitCalibration();

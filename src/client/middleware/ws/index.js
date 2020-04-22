@@ -5,15 +5,13 @@ import {
     loadBackingTrack,
     loadSingerLayer,
     play, seek,
-    setTransportTime,
     startRecording,
     stop,
     stopRecording, toggleLayer
-} from "./actions/audioActions";
-import {sendProgress, updateSingerState} from "./actions";
+} from "../../actions/audioActions";
+import {sendProgress, updateSingerState} from "../../actions";
 
-const BINARY_CHUNK_SIZE = 64000000000000;
-
+const BINARY_CHUNK_SIZE = 8000;
 
 export default store => next => {
 

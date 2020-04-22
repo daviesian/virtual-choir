@@ -21,7 +21,7 @@ let DeviceSelectionDialog = ({open, onClose, devices, dispatch}) => {
         <DialogTitle>Choose Audio Devices</DialogTitle>
         <DialogContent dividers>
             <List>
-                {devices?.inputs.map(d => <ListItem key={d.id} button selected={devices.inputId === d.id} onClick={() => dispatch(selectInputDevice(d.id))}>
+                {devices?.inputs.map(d => <ListItem key={d.id} button selected={devices.selectedInputId === d.id} onClick={() => dispatch(selectInputDevice(d.id))}>
                     <ListItemIcon>
                         <MicIcon />
                     </ListItemIcon>
@@ -30,7 +30,7 @@ let DeviceSelectionDialog = ({open, onClose, devices, dispatch}) => {
             </List>
             <Divider />
             <List>
-                {devices?.outputs.map(d => <ListItem key={d.id} button selected={devices.outputId === d.id} onClick={() => dispatch(selectOutputDevice(d.id))}>
+                {devices?.outputs.map(d => <ListItem key={d.id} button selected={devices.selectedOutputId === d.id} onClick={() => dispatch(selectOutputDevice(d.id))}>
                     <ListItemIcon>
                         <SpeakerIcon />
                     </ListItemIcon>

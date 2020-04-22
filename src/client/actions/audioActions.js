@@ -8,23 +8,25 @@ export const init = () => async dispatch => {
 
 export const reset = () => async dispatch => {
     await dispatch({type: "audio/close"});
-    dispatch({type: "RESET"});
+    dispatch({type: "RESET_AUDIO"});
 };
 
 export const selectInputDevice = (id) => async dispatch => {
-    await dispatch(init());
-    dispatch({
+    await dispatch(reset());
+    await dispatch({
         type: "SELECTED_INPUT_DEVICE",
         id
     });
+    await dispatch(init());
 };
 
 export const selectOutputDevice = (id) => async dispatch => {
-    await dispatch(init());
-    dispatch({
+    await dispatch(reset());
+    await dispatch({
         type: "SELECTED_OUTPUT_DEVICE",
         id
     });
+    await dispatch(init());
 };
 
 export const startCalibration = () => async dispatch => {
@@ -269,25 +271,30 @@ export const deleteLayer = (id, them) => async (dispatch, getState) => {
     });
 };
 
-export const setTransportTime = (time) => (dispatch, getState) => {
 
-    dispatch({
-        type: "SET_TRANSPORT_TIME",
-        time: time || 0,
-        _log: false
+export const seek = (time, them=false) => async (dispatch, getState) => {
+
+    let canSeek = await dispatch({
+        type: "audio/seek",
+        time,
     });
 
-};
+    if (canSeek) {
+        if (them) {
+            dispatch({
+                type: "ws/call",
+                fn: "seek",
+                kwargs: { time },
+            });
+        }
 
-export const seek = (time, them=false) => (dispatch, getState) => {
 
-    if (them) {
         dispatch({
-            type: "ws/call",
-            fn: "seek",
-            kwargs: { time },
+            type: "SEEK",
+            time: time || 0,
         });
+    } else {
+        dispatch(toast("Cannot seek while recording"));
     }
 
-    dispatch(setTransportTime(time));
 };
