@@ -24,6 +24,7 @@ const initialState = {
     sending: {},
     calibration: null,
     devices: null,
+    user: null,
 };
 
 let rootReducer = produce((state, action) => {
@@ -31,6 +32,10 @@ let rootReducer = produce((state, action) => {
         return initialState;
 
     switch (action.type) {
+
+        case "SET_USER":
+            state.user = action.user;
+            break
 
         case "SET_CONDUCTING":
             state.conducting = action.conducting;
@@ -117,6 +122,7 @@ let rootReducer = produce((state, action) => {
             break;
 
         case "LAYER_ADDED":
+            state.layers = state.layers.filter(l => l.id !== action.id);
             state.layers.push({
                 startTime: action.startTime,
                 duration: action.duration,

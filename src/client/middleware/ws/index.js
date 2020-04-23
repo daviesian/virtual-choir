@@ -1,5 +1,6 @@
 import RSVP from "rsvp";
 import log from 'loglevel';
+const queryString = require('query-string');
 import {
     deleteLayer,
     loadSingerLayer,
@@ -8,9 +9,9 @@ import {
     stop,
     stopRecording, updateLayer,
 } from "../../actions/audioActions";
-import {loadBackingTrack, sendProgress, updateSingerState} from "../../actions";
+import {loadBackingTrack, sendProgress, setUser, updateSingerState} from "../../actions";
 
-const BINARY_CHUNK_SIZE = 8000;
+const BINARY_CHUNK_SIZE = 64000;
 
 export default store => next => {
 
@@ -19,7 +20,25 @@ export default store => next => {
     let outstandingCalls = {};
     let nextCallId = 0;
 
+    // Try to get the userId from localStorage, queryString, and hash. In that order, each overwriting the last.
+    let userId = null;
+    try {
+        userId = localStorage['userId'];
+    } catch (e) { }
+    try {
+        let qs = queryString.parse(document.location.search);
+        userId = qs.userId || userId;
+    } catch (e) { }
+    try {
+        let hs = queryString.parse(document.location.hash);
+        userId = hs.userId || userId;
+    } catch (e) { }
+
     let commandHandlers = {
+        setUser: ({user}) => {
+            document.location.hash = `userId=${user.id}`;
+            store.dispatch(setUser(user));
+        },
         loadBackingTrack: ({track}) => {
             store.dispatch(loadBackingTrack(track));
         },
@@ -76,7 +95,7 @@ export default store => next => {
         if (window.socket) {
             window.socket.close();
         }
-        window.socket = new WebSocket(document.location.protocol.replace("http", "ws") + "//" + document.location.host + "/ws");
+        window.socket = new WebSocket(`${document.location.protocol.replace("http", "ws")}//${document.location.host}/ws${userId ? `?userId=${userId}` : ''}`);
         log.info("Websocket connecting...");
 
         window.socket.onopen = () => {
@@ -85,7 +104,7 @@ export default store => next => {
             ws.resolve(window.socket);
         };
 
-        window.socket.onclose = () => {
+        window.socket.onclose = (e) => {
             window.socket = null;
             ws.reject("Websocket closed");
             ws = RSVP.defer();

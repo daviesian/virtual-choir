@@ -59,7 +59,11 @@ export const setConducting = (conducting) => async (dispatch, getState) => {
 export const singerState = state => ({
     type: "ws/call",
     fn: "singerStateUpdate",
-    state: {},
+    kwargs: {
+        state: {
+            profile: state.profile,
+        }
+    },
 });
 
 export const updateSingerState = (singer, state) => ({
@@ -110,4 +114,27 @@ export const loadBackingTrack = ({id, name, url}, conduct = false) => async disp
         rms,
     })
 
+};
+
+export const setUser = (user) => ({
+    type: "SET_USER",
+    user
+});
+
+export const updateUser = ({name, voice}) => async (dispatch, getState) => {
+
+    let user = { ...getState().user };
+    user.name = name || user.name;
+    user.voice = voice || user.voice;
+
+    await dispatch({
+        type: "ws/call",
+        fn: "updateUser",
+        kwargs: {user}
+    });
+
+    dispatch({
+        type: "SET_USER",
+        user,
+    })
 };

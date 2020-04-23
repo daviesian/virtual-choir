@@ -3,6 +3,8 @@ require("regenerator-runtime");
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
 import SQL from 'sql-template-strings';
+import {v4 as uuid} from "uuid";
+
 
 let db = null;
 
@@ -12,9 +14,24 @@ export const openDB = async () => {
         driver: sqlite3.Database,
     });
 
+    await db.exec("CREATE TABLE IF NOT EXISTS users (id, name, voice)");
     await db.exec("CREATE TABLE IF NOT EXISTS backingTracks (id, name, url)");
     await db.exec("CREATE TABLE IF NOT EXISTS rooms (id, name, currentBackingTrackId)");
-    await db.exec("CREATE TABLE IF NOT EXISTS layers (id, backingTrackId, roomId, startTime, duration, enabled)");
+    await db.exec("CREATE TABLE IF NOT EXISTS layers (id, userId, backingTrackId, roomId, startTime, duration, enabled)");
+}
+
+export const getUser = async (id) => {
+    return await db.get(SQL`SELECT * FROM users WHERE id=${id}`);
+}
+
+export const createUser = async () => {
+    let newId = uuid();
+    await db.run(SQL`INSERT INTO users (id) VALUES (${newId})`);
+    return newId;
+}
+
+export const updateUser = async ({id, name, voice}) => {
+    await db.run(SQL`UPDATE users SET name=${name}, voice=${voice} WHERE id=${id}`);
 }
 
 export const ensureRoomExists = async (id) => {
@@ -49,10 +66,10 @@ export const setRoomBackingTrack = async (roomId, backingTrackId) => {
     return await getBackingTrack(backingTrackId);
 }
 
-export const saveLayer = async (id, backingTrackId, roomId, startTime) => {
+export const saveLayer = async (id, userId, backingTrackId, roomId, startTime) => {
     await ensureRoomExists(roomId);
-    await db.run(SQL`INSERT INTO layers (id, backingTrackId, roomId, startTime) 
-                  VALUES (${id}, ${backingTrackId}, ${roomId}, ${startTime})`);
+    await db.run(SQL`INSERT INTO layers (id, userId, backingTrackId, roomId, startTime) 
+                  VALUES (${id}, ${userId}, ${backingTrackId}, ${roomId}, ${startTime})`);
     return await getLayer(id);
 };
 

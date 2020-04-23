@@ -66,6 +66,7 @@
     "normalize.css": "^8.0.1",
     "notistack": "^0.9.10",
     "postcss-scss": "^2.0.0",
+    "query-string": "^6.12.1",
     "raw-loader": "4.0.0",
     "react": "^16.11.0",
     "react-dom": "^16.11.0",

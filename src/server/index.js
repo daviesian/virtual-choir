@@ -81,6 +81,12 @@ let sendToRoomConductor = (room, obj) => {
 };
 
 let messageHandlers = {
+    updateUser: async (client, {user}) => {
+        if (client.user.id === user.id) {
+            await db.updateUser(user);
+            sendToRoomConductor(client.room, {cmd: 'userUpdated', user});
+        }
+    },
     joinRoom: async (client, {room}) => {
         client.room = room;
         let dbRoom = await ensureRoomExists(room);
@@ -98,6 +104,9 @@ let messageHandlers = {
             // TODO: Check that this client is allowed to conduct
             forClientInRoom(client.room, c => { delete c.conducting; });
             client.conducting = true;
+            forClientInRoom(client.room, c => {
+                sendToRoomConductor(client.room, {cmd: "updateSingerState", user: c.user, state: c.singerState})
+            });
             clientLog(client, `Conducting room ${client.room}`)
         } else if (client.conducting) {
             client.conducting = false;
@@ -141,14 +150,14 @@ let messageHandlers = {
     },
     singerStateUpdate: (client, {state}) => {
         client.singerState = state;
-        sendToRoomConductor(client.room, {cmd: "updateSingerState", singer: client.id, state});
+        sendToRoomConductor(client.room, {cmd: "updateSingerState", user: client.user, state});
     },
     newLayer: async (client, { id, startTime, backingTrackId }, audioData) => {
         requireUuid(id);
         clientLog(client, "New layer:", audioData.length);
         fs.mkdirSync(".layers", {recursive: true});
         fs.writeFileSync(`.layers/${id}.raw`, audioData);
-        let layer = await saveLayer(id, backingTrackId, client.room, startTime);
+        let layer = await saveLayer(id, client.user.id, backingTrackId, client.room, startTime);
         if (!client.conducting) {
             sendToRoomConductor(client.room, {cmd: "newSingerLayer", layer});
         }
@@ -216,7 +225,7 @@ let onClientMessage = async (client, msg) => {
 };
 
 
-app.ws("/ws", (ws, {params: {room}}) => {
+app.ws("/ws", (ws, {query: {userId}}) => {
     ws.binaryType = 'arrayBuffer';
     let client = {
         id:  `client-${nextClientId++}`,
@@ -225,6 +234,12 @@ app.ws("/ws", (ws, {params: {room}}) => {
     };
     clients[client.id] = client;
     clientLog(client, "Connected");
+
+    (async () => {
+        let user = (userId && await db.getUser(userId)) || await db.getUser(await db.createUser());
+        client.user = user;
+        client.sendJSON({cmd: 'setUser', user});
+    })();
 
     ws.on("message", onClientMessage.bind(null, client));
 

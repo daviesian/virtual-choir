@@ -1,15 +1,14 @@
 import * as React from 'react';
 import {connect} from "react-redux";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import {
     play,
     stop,
     startRecording,
     stopRecording,
-    deleteLayer,
     init,
     reset,
-    seek, startCalibration, stopCalibration
+    seek,
 } from "../actions/audioActions";
 import Layer from "./Layer";
 import {makeStyles} from "@material-ui/core/styles";
@@ -18,18 +17,12 @@ import Button from "@material-ui/core/Button";
 import ButtonGroup from "@material-ui/core/ButtonGroup";
 import Typography from "@material-ui/core/Typography";
 import List from "@material-ui/core/List";
-import Paper from "@material-ui/core/Paper";
-import Card from "@material-ui/core/Card";
 import Transport from "./Transport";
-import {Switch} from "@material-ui/core";
 import {loadBackingTrack, setConducting} from "../actions";
 import LinearProgress from "@material-ui/core/LinearProgress";
-import Dialog from "@material-ui/core/Dialog";
-import DialogTitle from "@material-ui/core/DialogTitle";
-import DialogContent from "@material-ui/core/DialogContent";
-import DialogActions from "@material-ui/core/DialogActions";
-import CalibrationDialog from "./CalibrationDialog";
-import DeviceSelectionDialog from "./DeviceSelectionDialog";
+import CalibrationDialog from "./dialogs/Calibration";
+import DeviceSelectionDialog from "./dialogs/DeviceSelection";
+import ProfileDialog from "./dialogs/Profile";
 
 const useStyles = makeStyles(theme => ({
     root: {
@@ -53,11 +46,18 @@ const useStyles = makeStyles(theme => ({
     }
 }));
 
-let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending}) => {
+let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending, user}) => {
     const classes = useStyles();
 
     let [calibrationOpen, setCalibrationOpen] = useState(false);
     let [deviceSelectionOpen, setDeviceSelectionOpen] = useState(false);
+    let [profileOpen, setProfileOpen] = useState(false);
+
+    useEffect(() => {
+        if (user && !user?.name) {
+            setProfileOpen(true);
+        }
+    }, [user?.name]);
 
     return <div className={classes.root}>
         <div className={classes.header}>
@@ -67,6 +67,7 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending}
                 <Button onClick={() => setDeviceSelectionOpen(true)}>Devices</Button>
                 <Button onClick={() => setCalibrationOpen(true)}>Calibrate</Button>
             </ButtonGroup>
+            <Typography variant={"h5"}>{user?.name}</Typography>
             {conducting ? <Typography variant="h5">Conductor</Typography> : <Typography variant="h5">Singer</Typography> }
         </div>
         <Divider/>
@@ -92,6 +93,7 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending}
 
         <CalibrationDialog open={calibrationOpen} onClose={() => setCalibrationOpen(false)}/>
         <DeviceSelectionDialog open={deviceSelectionOpen} onClose={() => setDeviceSelectionOpen(false)}/>
+        <ProfileDialog open={profileOpen} user={user} onClose={() => setProfileOpen(false)}/>
 
     </div>;
 };
@@ -102,4 +104,5 @@ export default connect(state => ({
     layers: state.layers,
     conducting: state.conducting,
     sending: state.sending,
+    user: state.user,
 }))(Home);

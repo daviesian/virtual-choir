@@ -4,7 +4,7 @@ import DialogContent from "@material-ui/core/DialogContent";
 import DialogActions from "@material-ui/core/DialogActions";
 import Button from "@material-ui/core/Button";
 import CheckCircleOutlinedIcon from '@material-ui/icons/CheckCircleOutlined';
-import {startCalibration, stopCalibration} from "../actions/audioActions";
+import {startCalibration, stopCalibration} from "../../actions/audioActions";
 import * as React from "react";
 import {connect} from "react-redux";
 import Typography from "@material-ui/core/Typography";
@@ -12,6 +12,7 @@ import {CircularProgress, colors} from "@material-ui/core";
 import LinearProgress from "@material-ui/core/LinearProgress";
 import {makeStyles} from "@material-ui/core/styles";
 import Replay from "@material-ui/icons/Replay";
+import {useCallback} from "react";
 
 let useStyles = makeStyles(theme => ({
     progress: {
@@ -25,6 +26,12 @@ let CalibrationDialog = ({open, onClose, calibration, dispatch}) => {
 
     let samplesPercent = Math.min(100, 100 * (calibration?.samples?.length || 0) / 3);
     let accuracyPercent = Math.max(10, 100 - Math.min(100, (calibration?.sd*1000 || 100)));
+
+    let dismissIfNotCalibrating = useCallback(() => {
+        if (!calibration?.type) {
+            onClose();
+        }
+    },[calibration?.type]);
 
     let content = <Typography variant="body1">
         This calibration will measure the latency of your audio system. Make sure your surroundings are quiet before continuing.
@@ -56,7 +63,7 @@ let CalibrationDialog = ({open, onClose, calibration, dispatch}) => {
         </div>;
     }
 
-    return <Dialog open={open}>
+    return <Dialog open={open} onClose={dismissIfNotCalibrating}>
         <DialogTitle>Audio Calibration</DialogTitle>
         <DialogContent dividers>
             {content}
