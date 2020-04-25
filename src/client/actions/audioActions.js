@@ -103,6 +103,9 @@ export const updateLayer = (layer, them=false) => async (dispatch, getState) => 
 
 export const play = (startTime, me=true, them=false) => async (dispatch, getState) => {
 
+    if (!await dispatch({type: "audio/play", startTime}))
+        return;
+
     if (them) {
         dispatch({
             type:"ws/call",
@@ -112,18 +115,13 @@ export const play = (startTime, me=true, them=false) => async (dispatch, getStat
     }
 
     if (me) {
-        try {
-            await dispatch({type: "audio/play", startTime});
-            dispatch({
-                type: "PLAYBACK_STARTED",
-            });
-        } catch (e) {
-            dispatch(toast(e, 'error'));
-        }
-    }
+        dispatch({
+            type: "PLAYBACK_STARTED",
+        });
 
-    if (!getState().conducting) {
-        dispatch(singerState(getState()));
+        if (!getState().conducting) {
+            dispatch(singerState(getState()));
+        }
     }
 };
 
@@ -137,20 +135,33 @@ export const stop = (me=true, them=false) => async (dispatch, getState) => {
         });
     }
 
-    if (me) {
-        await dispatch({type: "audio/stop"});
+    if (me && await dispatch({type: "audio/stop"})) {
+
         dispatch({
             type: "PLAYBACK_STOPPED",
         });
+        if (!getState().conducting) {
+            dispatch(singerState(getState()));
+        }
     }
 
-    if (!getState().conducting) {
-        dispatch(singerState(getState()));
-    }
 
 };
 
 export const startRecording = (me=true, them=false) => async (dispatch, getState) => {
+
+    let wasPlaying = getState().playing
+
+    if (!wasPlaying) {
+        await dispatch(play(getState().transport.currentTime, me, them));
+    }
+
+    if (!await dispatch({type: "audio/startRecording"})) {
+        if (!wasPlaying) {
+            await dispatch(stop(me, them));
+        }
+        return;
+    }
 
     if (them) {
         dispatch({
@@ -161,43 +172,39 @@ export const startRecording = (me=true, them=false) => async (dispatch, getState
     }
 
     if (me) {
-        try {
-            await dispatch({type: "audio/startRecording"});
-            dispatch({
-                type: "RECORDING_STARTED",
-            });
-        } catch (e) {
-            dispatch(toast(e, 'error'));
+        dispatch({
+            type: "RECORDING_STARTED",
+        });
+
+        if (!getState().conducting) {
+            dispatch(singerState(getState()));
         }
     }
-
-    if (!getState().conducting) {
-        dispatch(singerState(getState()));
-    }
-
 };
 
 export const stopRecording = (me=true, them=false) => async (dispatch, getState) => {
 
+    if (!await dispatch({type: "audio/stopRecording"})) {
+        return;
+    }
+
     if (them) {
         dispatch({
-            type:"ws/call",
+            type: "ws/call",
             fn: "stopRecording",
             kwargs: {},
         });
     }
 
     if (me) {
-        await dispatch({type: "audio/stopRecording"});
         dispatch({
             type: "RECORDING_STOPPED",
         });
-    }
 
-    if (!getState().conducting) {
-        dispatch(singerState(getState()));
+        if (!getState().conducting) {
+            dispatch(singerState(getState()));
+        }
     }
-
 };
 
 export const recordingFinished = (layerId, audioData, startTime) => async (dispatch, getState) => {
@@ -250,33 +257,31 @@ export const deleteLayer = (layerId, them) => async (dispatch, getState) => {
 };
 
 
-export const seek = (time, them=false) => async (dispatch, getState) => {
+export const seek = (time, me=true, them=false) => async (dispatch, getState) => {
+    console.log(them);
+    if(!await dispatch({ type: "audio/seek", time })) {
+        return;
+    }
 
-    let canSeek = await dispatch({
-        type: "audio/seek",
-        time,
-    });
+    if (them) {
+        dispatch({
+            type: "ws/call",
+            fn: "seek",
+            kwargs: { time },
+        });
+    }
 
-    if (canSeek) {
-        if (them) {
-            dispatch({
-                type: "ws/call",
-                fn: "seek",
-                kwargs: { time },
-            });
-        }
-
-
+    if (me) {
         dispatch({
             type: "SEEK",
             time: time || 0,
         });
-    } else {
-        dispatch(toast("Cannot seek while recording"));
+
+        if (!getState().conducting) {
+            dispatch(singerState(getState()));
+        }
     }
 
 };
 
-// TODO: Click to start
 // TODO: Enable and disable tracks while playing
-// TODO: Upload upload progress

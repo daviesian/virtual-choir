@@ -273,6 +273,8 @@ export const play = startTime => {
     s.recorderNode.call("setStartTimeOffset", s.transportStartTime);
     s.backingTrackSourceNode.start(s.context.currentTime + preloadTime, startTime);
     scheduleUpcomingLayers();
+
+    return true; // N.B. If there's some reason we couldn't start playback, could return false instead.
 };
 
 export const stop = () => {
@@ -288,30 +290,32 @@ export const stop = () => {
         s.backingTrackSourceNode.disconnect();
     }
     s.transportStartTime = null;
+
+    return true; // Could return false if for some reason we couldn't stop.
 };
 
 export const seek = time => {
     if (s.transportStartTime === null) {
-        // We are stopped.
-        return true; // Yes, we can seek.
+        return true; // We're not playing. Sure, go ahead and seek.
     }
-
     if (s.recorderNode.parameters.get("recording").value === 0) {
         // We are playing, and not recording.
         stop();
         play(time);
-        return true;
+        return true; // Seek succeeded.
     }
-    console.log("Nope")
-    return false;
+
+    return false; // Seek failed.
 };
 
 export const record = () => {
     s.recorderNode.parameters.get("recording").value = 1;
+    return true;
 };
 
 export const stopRecord = () => {
     s.recorderNode.parameters.get("recording").value = 0;
+    return true;
 };
 
 export const addLayer = async (layerId, startTime, enabled=false, audioData=null) => {

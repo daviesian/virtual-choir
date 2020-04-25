@@ -1,4 +1,5 @@
 import {loadSingerLayer} from "./audioActions";
+import parseSRT from 'parse-srt'
 
 export const toast = (message, level='info') => ({
     type: "TOAST",
@@ -127,6 +128,9 @@ export const loadBackingTrack = ({backingTrackId, name, url}, conduct = false) =
         url,
     });
 
+    let lyricsSrt = await (await fetch(url.replace(/\.[^.]*$/, ".srt"))).text();
+    let lyrics = parseSRT(lyricsSrt);
+
     dispatch({
         type: "BACKING_TRACK_LOADED",
         backingTrackId,
@@ -134,6 +138,7 @@ export const loadBackingTrack = ({backingTrackId, name, url}, conduct = false) =
         url,
         duration,
         rms,
+        lyrics,
     })
 
 };
@@ -162,3 +167,19 @@ export const updateUser = ({name, voice}) => async (dispatch, getState) => {
 
     dispatch(singerState(getState()));
 };
+
+export const setRehearsalState = (rehearsalState, conduct=false) => async (dispatch, getState) => {
+
+    if (conduct) {
+        dispatch({
+            type: "ws/call",
+            fn: "setRehearsalState",
+            kwargs: {rehearsalState},
+        });
+    }
+
+    dispatch({
+        type: "SET_REHEARSAL_STATE",
+        rehearsalState,
+    });
+}

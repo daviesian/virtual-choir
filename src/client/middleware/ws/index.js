@@ -9,13 +9,22 @@ import {
     stop,
     stopRecording, updateLayer,
 } from "../../actions/audioActions";
-import {loadBackingTrack, sendProgress, setUser, singerJoined, singerLeft, updateSingerState} from "../../actions";
+import {
+    loadBackingTrack,
+    sendProgress,
+    setRehearsalState,
+    setUser,
+    singerJoined,
+    singerLeft,
+    updateSingerState
+} from "../../actions";
 
 const BINARY_CHUNK_SIZE = 64000;
 
+
 export default store => next => {
 
-    let ws = RSVP.defer();
+    let ws = RSVP.defer(); // Will be resolved when we get back a user from the server after connecting.
 
     let outstandingCalls = {};
     let nextCallId = 0;
@@ -37,6 +46,8 @@ export default store => next => {
     let commandHandlers = {
         setUser: ({user}) => {
             document.location.hash = `userId=${user.userId}`;
+            ws.resolve(window.socket);
+
             store.dispatch(setUser(user));
         },
         loadBackingTrack: ({track}) => {
@@ -74,7 +85,10 @@ export default store => next => {
         },
         singerLeft: ({userId}) => {
             store.dispatch(singerLeft(userId));
-        }
+        },
+        setRehearsalState: ({rehearsalState}) => {
+            store.dispatch(setRehearsalState(rehearsalState));
+        },
     };
 
     let receiveIncomingMessage = ({data}) => {
@@ -107,7 +121,6 @@ export default store => next => {
         window.socket.onopen = () => {
             log.info("Websocket connected");
             ws.binaryType = 'arrayBuffer';
-            ws.resolve(window.socket);
         };
 
         window.socket.onclose = (e) => {

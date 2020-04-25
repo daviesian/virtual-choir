@@ -16,7 +16,7 @@ export const openDB = async () => {
 
     await db.exec("CREATE TABLE IF NOT EXISTS users (userId, name, voice)");
     await db.exec("CREATE TABLE IF NOT EXISTS backingTracks (backingTrackId, name, url)");
-    await db.exec("CREATE TABLE IF NOT EXISTS rooms (roomId, name, currentBackingTrackId)");
+    await db.exec("CREATE TABLE IF NOT EXISTS rooms (roomId, name, currentBackingTrackId, rehearsalState)");
     await db.exec("CREATE TABLE IF NOT EXISTS layers (layerId, userId, backingTrackId, roomId, startTime, duration, enabled)");
 }
 
@@ -39,6 +39,7 @@ export const ensureRoomExists = async (roomId) => {
     if (!room) {
         await db.run(SQL`INSERT INTO rooms (roomId) VALUES (${roomId})`);
     }
+    room.rehearsalState = room.rehearsalState ? JSON.parse(room.rehearsalState) : undefined;
     return room;
 };
 
@@ -89,3 +90,7 @@ export const getLayer = async (layerId) => {
 export const getLayers = async (roomId, backingTrackId) => {
     return await db.all(SQL`SELECT * FROM layers NATURAL JOIN users WHERE roomId=${roomId} AND backingTrackId=${backingTrackId}`);
 }
+
+export const setRehearsalState = async (roomId, rehearsalState) => {
+    return await db.run(SQL`UPDATE rooms SET rehearsalState=${JSON.stringify(rehearsalState)} WHERE roomId=${roomId}`);
+};

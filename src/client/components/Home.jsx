@@ -32,6 +32,7 @@ import IconButton from "@material-ui/core/IconButton";
 import PeopleIcon from "@material-ui/icons/People";
 import {Switch} from "@material-ui/core";
 import SingerList from "./SingerList";
+import Lyrics from "./Lyrics";
 
 const useStyles = makeStyles(theme => ({
     root: {
@@ -112,7 +113,7 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending,
                 <Button onClick={() => dispatch(loadBackingTrack({backingTrackId: "let-it-go", name: "Let It Go", url:"/let-it-go.mp3"}, conducting))}>Load backing track</Button>
                 <Button onClick={() => dispatch(play(transportTime, true, conducting))}>Play</Button>
                 <Button onClick={() => dispatch(stop(true, conducting))}>Stop</Button>
-                <Button onClick={() => dispatch(seek(0, conducting))}>Rewind</Button>
+                <Button onClick={() => dispatch(seek(0, true, conducting))}>Rewind</Button>
                 <Button onClick={() => dispatch(startRecording(true, conducting))}>Start Recorder</Button>
                 <Button onClick={() => dispatch(stopRecording(true, conducting))}>Stop Recorder</Button>
             </ButtonGroup>
@@ -120,8 +121,10 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending,
             <Typography variant="h1">{backingTrack?.name}</Typography>
             <Typography variant="h2">{transportTime != null ? transportTime.toFixed(2) : ''}</Typography>
 
-
             <Transport backingTrack={backingTrack} tracks={layers}/>
+
+            <Lyrics lyrics={backingTrack?.lyrics}/>
+
             <List>
                 {layers.map((layer, i) => <Layer key={i} layer={layer}/>)}
             </List>

@@ -80,8 +80,8 @@ export default store => next => {
 
 
                 case "play":
-                    if (!s.backingTrackAudioBuffer) {
-                        throw "Cannot start playback before loading backing track";
+                    if (!s.backingTrackAudioBuffer || s.transportStartTime !== null) {
+                        return false; // Should also return false here if there are any other reasons we can't start playback
                     }
                     await _init();
 
@@ -91,45 +91,29 @@ export default store => next => {
                         }
                         layer.sourceNode = null;
                     }
-                    play(action.startTime || 0);
-
-
-                    return true;
+                    return play(action.startTime || 0);
 
                 case "seek":
                     return seek(action.time);
 
                 case "stop":
-                    if (!s.context)
-                        return;
+                    if (!s.context || s.transportStartTime === null)
+                        return false;
 
-                    stop();
+                    return stop();
 
-                    break;
 
                 case "startRecording":
                     if (s.transportStartTime === null) {
-                        dispatch({
-                            type: "TOAST",
-                            level: "warn",
-                            message: "Cannot start recording unless backing track is playing",
-                        });
-                        return false;
+                        return false; // Can't start recording if we're not playing.
                     }
-                    await record();
-                    return true;
+                    return record();
 
                 case "stopRecording":
-                    if (s.recorderNode.parameters.get("recording").value !== 1) {
-                        // dispatch({
-                        //     type: "TOAST",
-                        //     level: "warn",
-                        //     message: "Cannot stop recording - recording not started",
-                        // });
-                        return false;
+                    if (s.transportStartTime === null || s.recorderNode.parameters.get("recording").value !== 1) {
+                        return false; // Can't stop recording unless we're already recording.
                     }
-                    await stopRecord();
-                    return true;
+                    return stopRecord();
 
                 case "addLayer":
                     await _init();

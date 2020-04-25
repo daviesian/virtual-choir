@@ -66,6 +66,7 @@
     "node-wav-player": "^0.1.0",
     "normalize.css": "^8.0.1",
     "notistack": "^0.9.10",
+    "parse-srt": "^1.0.0-alpha",
     "postcss-scss": "^2.0.0",
     "query-string": "^6.12.1",
     "raw-loader": "4.0.0",

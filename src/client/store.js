@@ -26,6 +26,7 @@ const initialState = {
     devices: null,
     user: null,
     singers: {},
+    rehearsalState: {},
 };
 
 let rootReducer = produce((state, action) => {
@@ -94,7 +95,8 @@ let rootReducer = produce((state, action) => {
                 duration: action.duration,
                 backingTrackId: action.backingTrackId,
                 url: action.url,
-                rms: action.rms
+                rms: action.rms,
+                lyrics: action.lyrics,
             };
             break;
 
@@ -112,6 +114,7 @@ let rootReducer = produce((state, action) => {
 
         case "PLAYBACK_STOPPED":
             state.transport.playing = false;
+            state.transport.recording = false;
             break;
 
         case "RECORDING_STARTED":
@@ -175,6 +178,11 @@ let rootReducer = produce((state, action) => {
                 user: action.user,
                 state: null,
             };
+            break;
+
+        case "SET_REHEARSAL_STATE":
+            state.rehearsalState = action.rehearsalState;
+
             break;
     }
 }, initialState);

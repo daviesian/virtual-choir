@@ -44,7 +44,7 @@ let Track = ({layerId, isBackingTrack=false, name, startTime, duration, startTim
 
     const trackClick = useCallback(e => {
         if (isBackingTrack) {
-            dispatch(seek(duration * (e.pageX - e.target.getBoundingClientRect().left) / e.target.getBoundingClientRect().width, conducting))
+            dispatch(seek(duration * (e.pageX - e.target.getBoundingClientRect().left) / e.target.getBoundingClientRect().width, true, conducting))
         } else {
             dispatch(updateLayer({layerId, enabled: !enabled}, conducting));
         }

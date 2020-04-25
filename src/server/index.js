@@ -5,7 +5,7 @@ import {
     ensureRoomExists,
     getBackingTrack,
     openDB,
-    saveLayer,
+    saveLayer, setRehearsalState,
     setRoomBackingTrack,
     updateLayer
 } from "./data";
@@ -108,7 +108,7 @@ let messageHandlers = {
             forClientInRoom(client.room, c => { delete c.conducting; });
             client.conducting = true;
             forClientInRoom(client.room, c => {
-                sendToRoomConductor(client.room, {cmd: "updateSingerState", user: c.user, state: c.singerState})
+                sendToRoomConductor(client.room, {cmd: "updateSingerState", user: c.user, state: c.singerState});
             });
             clientLog(client, `Conducting room ${client.room}`)
         } else if (client.conducting) {
@@ -180,6 +180,11 @@ let messageHandlers = {
         conduct(client.room, {cmd: "deleteLayer", layerId});
         await deleteLayer(layerId);
         try { fs.unlinkSync(`.layers/${layerId}.raw`); } catch (e) { }
+    },
+    setRehearsalState: async (client, {roomId, rehearsalState}) => {
+        requireConductor(client);
+        conduct(client.room, {cmd: "setRehearsalState", rehearsalState});
+        await setRehearsalState(roomId, rehearsalState);
     },
 };
 
