@@ -12,6 +12,8 @@ let AppRouter = ({dispatch}) => {
 
     useEffect(() => {
 
+        console.warn("RRR", !!room, !!conductMatch);
+
         if (room) {
             dispatch(requestJoinRoom(room));
             if (conductMatch) {
@@ -20,7 +22,7 @@ let AppRouter = ({dispatch}) => {
         } else {
             dispatch(requestLeaveRoom());
         }
-    }, [room, conductMatch]);
+    }, [room, !!conductMatch]);
 
     return null;
 };

@@ -13,9 +13,16 @@ import SpeakerIcon from '@material-ui/icons/Speaker';
 import SpeakerOutlinedIcon from '@material-ui/icons/Speaker';
 import ListItemText from "@material-ui/core/ListItemText";
 import Divider from "@material-ui/core/Divider";
-import {selectInputDevice, selectOutputDevice} from "../../actions/audioActions";
+import {initDevices, selectInputDevice, selectOutputDevice} from "../../actions/audioActions";
+import {useEffect} from "react";
 
 let DeviceSelectionDialog = ({open, onClose, devices, dispatch}) => {
+
+    useEffect(() => {
+        if (open) {
+            dispatch(initDevices(true));
+        }
+    }, [open]);
 
     return <Dialog open={open} scroll="body" onClose={onClose}>
         <DialogTitle>Choose Audio Devices</DialogTitle>

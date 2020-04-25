@@ -83,6 +83,7 @@ let sendToRoomConductor = (room, obj) => {
 let messageHandlers = {
     updateUser: async (client, {user}) => {
         if (client.user.userId === user.userId) {
+            client.user = user;
             await db.updateUser(user);
             sendToRoomConductor(client.room, {cmd: 'userUpdated', user});
         }
@@ -91,11 +92,13 @@ let messageHandlers = {
         client.room = room;
         let dbRoom = await ensureRoomExists(room);
         clientLog(client, `Joined room '${room}'`);
+        sendToRoomConductor(client.room, {cmd: "singerJoined", user: client.user})
         return dbRoom;
     },
     leaveRoom: (client) => {
         if (client.room) {
             clientLog(client, `Left room '${client.room}'`);
+            sendToRoomConductor(client.room, {cmd: "singerLeft", userId: client.user.userId});
             delete client.room;
         }
     },
@@ -172,9 +175,11 @@ let messageHandlers = {
         conduct(client.room, {cmd: "updateLayer", layer: updatedLayer});
     },
     deleteLayer: async (client, {layerId}) => {
+        requireUuid(layerId);
         requireConductor(client);
         conduct(client.room, {cmd: "deleteLayer", layerId});
         await deleteLayer(layerId);
+        try { fs.unlinkSync(`.layers/${layerId}.raw`); } catch (e) { }
     },
 };
 
@@ -246,6 +251,7 @@ app.ws("/ws", (ws, {query: {userId}}) => {
     ws.on("close", () => {
         clientLog(client, "Disconnected");
         delete clients[client.clientId];
+        messageHandlers.leaveRoom(client)
     })
 });
 

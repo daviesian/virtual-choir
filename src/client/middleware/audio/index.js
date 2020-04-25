@@ -5,8 +5,8 @@ import s from "./state";
 export default store => next => {
 
     let initDevicesPromise = null;
-    let _initDevices = async () => {
-        if (!initDevicesPromise) {
+    let _initDevices = async (reload=false) => {
+        if (!initDevicesPromise || reload) {
             initDevicesPromise = new Promise(async (resolve, reject) => {
                 let devices = await getDevices();
 
@@ -42,7 +42,7 @@ export default store => next => {
             switch (action.type.substr(6)) {
 
                 case "initDevices":
-                    await _initDevices();
+                    await _initDevices(action.reload);
                     break;
 
                 case "init": {

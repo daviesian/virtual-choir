@@ -1,3 +1,4 @@
+import s from "./middleware/audio/state";
 
 
 export const getAudioBufferRMSImageURL = async (audioBuffer, imgWidth, imgHeight=70) => {
@@ -23,4 +24,8 @@ export const getAudioBufferRMSImageURL = async (audioBuffer, imgWidth, imgHeight
     });
 
     return URL.createObjectURL(blob);
+};
+
+export const pageInteractionRequired = async () => {
+    return new AudioContext().state === 'suspended';
 };

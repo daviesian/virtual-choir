@@ -53,7 +53,7 @@ let Track = ({layerId, isBackingTrack=false, name, startTime, duration, startTim
     return <div className={classes.track}>
         <Paper className={classes.layer} elevation={3} onClick={trackClick}>
             <Typography variant="caption">
-                {layerId}
+                {name}
             </Typography>
         </Paper>
     </div>;

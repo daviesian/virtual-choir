@@ -1,5 +1,11 @@
 import {singerState, toast} from "./index";
 
+export const initDevices = (reload=false) => async dispatch => {
+    await dispatch({
+        type: "audio/initDevices",
+        reload,
+    });
+}
 
 export const init = () => async dispatch => {
     await dispatch({type: "audio/init"});
@@ -58,7 +64,7 @@ export const loadSingerLayer = (layer) => async (dispatch, getState) => {
         duration: addedLayer.duration,
         layerId: layer.layerId,
         rms: addedLayer.rms,
-        name: "/.layers/" + layer.layerId, // TODO: Use a nicer name. Username, for example.
+        name: layer.name,
         enabled: layer.enabled,
     });
 
@@ -209,7 +215,7 @@ export const recordingFinished = (layerId, audioData, startTime) => async (dispa
         duration: addedLayer.duration,
         layerId,
         rms: addedLayer.rms,
-        name: "Layer " + layerId, // TODO: Use a nicer name. Username, for example.
+        name: getState().user.name,
         conductor: true,
         enabled: false,
     });
@@ -270,3 +276,7 @@ export const seek = (time, them=false) => async (dispatch, getState) => {
     }
 
 };
+
+// TODO: Click to start
+// TODO: Enable and disable tracks while playing
+// TODO: Upload upload progress

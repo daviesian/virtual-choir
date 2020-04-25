@@ -9,7 +9,7 @@ import {
     stop,
     stopRecording, updateLayer,
 } from "../../actions/audioActions";
-import {loadBackingTrack, sendProgress, setUser, updateSingerState} from "../../actions";
+import {loadBackingTrack, sendProgress, setUser, singerJoined, singerLeft, updateSingerState} from "../../actions";
 
 const BINARY_CHUNK_SIZE = 64000;
 
@@ -57,8 +57,8 @@ export default store => next => {
         seek: ({time}) => {
             store.dispatch(seek(time));
         },
-        updateSingerState: ({singer, state}) => {
-            store.dispatch(updateSingerState(singer, state));
+        updateSingerState: ({user, state}) => {
+            store.dispatch(updateSingerState(user, state));
         },
         newSingerLayer: ({layer}) => {
             store.dispatch(loadSingerLayer(layer));
@@ -68,6 +68,12 @@ export default store => next => {
         },
         deleteLayer: ({layerId}) => {
             store.dispatch(deleteLayer(layerId));
+        },
+        singerJoined: ({user}) => {
+            store.dispatch(singerJoined(user));
+        },
+        singerLeft: ({userId}) => {
+            store.dispatch(singerLeft(userId));
         }
     };
 
@@ -119,10 +125,6 @@ export default store => next => {
         window.socket.onmessage = receiveIncomingMessage;
     };
 
-    if (!window.socket) {
-        initWs();
-    }
-
     let sendJSON = async obj => {
         (await ws.promise).send(JSON.stringify(obj));
     };
@@ -130,12 +132,20 @@ export default store => next => {
     // Data is a TypedArray
     let sendBinary = async (callId, data) => {
         let w = await ws.promise;
+        let lastCoarseProgressUpdate = null;
         for (let i = 0; i < data.buffer.byteLength; i += BINARY_CHUNK_SIZE) {
             let chunkLength = Math.min(BINARY_CHUNK_SIZE, data.buffer.byteLength - i)
             w.send(new Uint8Array(data.buffer, i, chunkLength));
             await new Promise(r => setTimeout(r,100));
-            store.dispatch(sendProgress(callId, i+chunkLength, data.buffer.byteLength));
+            let progress = (i+chunkLength) / data.buffer.byteLength;
+            let coarseUpdate = false;
+            if (lastCoarseProgressUpdate === null || (progress - lastCoarseProgressUpdate > 0.05 )) {
+                lastCoarseProgressUpdate = progress;
+                coarseUpdate = true;
+            }
+            store.dispatch(sendProgress(callId, i+chunkLength, data.buffer.byteLength, coarseUpdate));
         }
+        store.dispatch(sendProgress(callId, data.buffer.byteLength, data.buffer.byteLength, true));
     };
 
     let call = async (fn, kwargs={}, data=null) => {
@@ -159,6 +169,10 @@ export default store => next => {
 
         if (action.type.startsWith("ws/")) {
             switch (action.type.substr(3)) {
+                case "connect":
+                    initWs();
+                    break;
+
                 case "call":
                     return await call(action.fn, action.kwargs, action.data);
             }

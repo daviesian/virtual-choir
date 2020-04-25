@@ -43,6 +43,7 @@
     "babel-plugin-react-css-modules": "^5.2.6",
     "bootstrap": "^3.3.7",
     "bootstrap-select": "^1.13.12",
+    "clsx": "^1.1.0",
     "codemirror": "^5.48.2",
     "connected-react-router": "latest",
     "console-stamp": "^0.2.6",

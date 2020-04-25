@@ -61,18 +61,33 @@ export const singerState = state => ({
     fn: "singerStateUpdate",
     kwargs: {
         state: {
-            profile: state.profile,
+            user: state.user,
+            sending: state.sending,
+            playing: state.transport?.playing,
+            recording: state.transport?.recording,
+            backingTrackId: state.backingTrack?.backingTrackId,
+            loadedLayers: state.layers.map(layer => layer.layerId),
         }
     },
 });
 
-export const updateSingerState = (singer, state) => ({
+export const updateSingerState = (user, state) => ({
     type: "UPDATE_SINGER_STATE",
-    singer,
+    user,
     state
 });
 
-export const sendProgress = (transferId, sentBytes, totalBytes) => (dispatch, getState) => {
+export const singerJoined = (user) => ({
+    type: "SINGER_JOINED",
+    user,
+});
+
+export const singerLeft = (userId) => ({
+    type: "SINGER_LEFT",
+    userId,
+});
+
+export const sendProgress = (transferId, sentBytes, totalBytes, coarseUpdate=false) => (dispatch, getState) => {
     dispatch({
         type: "SEND_PROGRESS",
         _log: false,
@@ -82,11 +97,18 @@ export const sendProgress = (transferId, sentBytes, totalBytes) => (dispatch, ge
     });
 
     if (sentBytes === totalBytes) {
-        setTimeout(() => dispatch({
-            type: "SEND_PROGRESS_DONE",
-            transferId,
-        }), 1000);
+        setTimeout(() => {
+            dispatch({
+                type: "SEND_PROGRESS_DONE",
+                transferId,
+            });
+            dispatch(singerState(getState()));
+        }, 1000);
+        dispatch(singerState(getState()));
+    } else if (coarseUpdate) {
+        dispatch(singerState(getState()));
     }
+
 };
 
 
@@ -137,4 +159,6 @@ export const updateUser = ({name, voice}) => async (dispatch, getState) => {
         type: "SET_USER",
         user,
     })
+
+    dispatch(singerState(getState()));
 };

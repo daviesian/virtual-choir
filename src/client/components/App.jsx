@@ -10,10 +10,17 @@ import {blue, green, orange, red} from "@material-ui/core/colors";
 import {CssBaseline} from "@material-ui/core";
 import AppRouter from "./AppRouter";
 import { SnackbarProvider } from 'notistack';
-import {useEffect} from "react";
+import {useEffect, useState} from "react";
+import {initDevices} from "../actions/audioActions";
+import {pageInteractionRequired} from "../util";
+import Button from "@material-ui/core/Button";
+import Dialog from "@material-ui/core/Dialog";
+import DialogContent from "@material-ui/core/DialogContent";
+import DialogTitle from "@material-ui/core/DialogTitle";
+import DialogActions from "@material-ui/core/DialogActions";
 
 setConfig({
-    reloadHooks: true,
+    reloadHooks: false,
 });
 
 const theme = createMuiTheme({
@@ -27,18 +34,32 @@ const theme = createMuiTheme({
 
 let App = ({}) => {
 
+    let [launchPopup, setLaunchPopup] = useState(null);
+
+    useEffect(() => {(async () => {
+        dispatch(initDevices());
+
+        setLaunchPopup(await pageInteractionRequired());
+    })()},[]);
+
     useEffect(() => {
-        store.dispatch({
-            type: "audio/initDevices",
-        });
-    },[]);
+        if (launchPopup === false) {
+            // We have explicitly decided that we're ready for audio. This will happen at most once.
+            dispatch({
+                type: "ws/connect",
+            });
+        }
+    }, [launchPopup]);
 
     return <Provider store={store}>
         <Router history={history}>
             <ThemeProvider theme={theme}>
                 <CssBaseline/>
                 <SnackbarProvider maxSnack={3}>
-                    <Home/>
+                    {launchPopup ? <Dialog open={true}>
+                        <DialogTitle>Welcome to the Choir!</DialogTitle>
+                        <DialogActions><Button variant="contained" color="primary" onClick={async () => setLaunchPopup(await pageInteractionRequired())}>Get started</Button></DialogActions>
+                    </Dialog> : <Home/>}
                 </SnackbarProvider>
             </ThemeProvider>
             <AppRouter/>

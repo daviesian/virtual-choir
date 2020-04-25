@@ -83,9 +83,9 @@ export const deleteLayer = async (layerId) => {
 };
 
 export const getLayer = async (layerId) => {
-    return await db.get(SQL`SELECT * FROM layers WHERE layerId=${layerId}`);
+    return await db.get(SQL`SELECT * FROM layers NATURAL JOIN users WHERE layerId=${layerId}`);
 }
 
 export const getLayers = async (roomId, backingTrackId) => {
-    return await db.all(SQL`SELECT * FROM layers WHERE backingTrackId=${backingTrackId}`);
+    return await db.all(SQL`SELECT * FROM layers NATURAL JOIN users WHERE roomId=${roomId} AND backingTrackId=${backingTrackId}`);
 }

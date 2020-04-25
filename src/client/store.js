@@ -25,6 +25,7 @@ const initialState = {
     calibration: null,
     devices: null,
     user: null,
+    singers: {},
 };
 
 let rootReducer = produce((state, action) => {
@@ -156,6 +157,24 @@ let rootReducer = produce((state, action) => {
             break;
         case "SEND_PROGRESS_DONE":
             delete state.sending[action.transferId];
+            break;
+
+        case "UPDATE_SINGER_STATE":
+            state.singers[action.user.userId] = {
+                user: action.user,
+                state: action.state,
+            };
+            break;
+
+        case "SINGER_LEFT":
+            delete state.singers[action.userId];
+            break;
+
+        case "SINGER_JOINED":
+            state.singers[action.user.userId] = {
+                user: action.user,
+                state: null,
+            };
             break;
     }
 }, initialState);
