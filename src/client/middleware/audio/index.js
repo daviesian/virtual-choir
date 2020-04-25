@@ -53,7 +53,7 @@ export default store => next => {
                         await loadBackingTrack(state.backingTrack.url);
                     }
                     for (let layer of state.layers || []) {
-                        await addLayer(layer.id, layer.startTime, layer.enabled);
+                        await addLayer(layer.layerId, layer.startTime, layer.enabled);
                     }
                     break;
                 }
@@ -133,10 +133,10 @@ export default store => next => {
 
                 case "addLayer":
                     await _init();
-                    return await addLayer(action.id, action.startTime, action.enabled, action.audioData);
+                    return await addLayer(action.layerId, action.startTime, action.enabled, action.audioData);
 
                 case "enableLayer": {
-                    let layer = s.layers.find(({id}) => id === action.id);
+                    let layer = s.layers.find(({layerId}) => layerId === action.layerId);
                     if (layer) {
                         layer.enabled = action.enabled;
                         return true;
@@ -146,7 +146,7 @@ export default store => next => {
                 }
 
                 case "deleteLayer":
-                    s.layers = s.layers.filter(layer => layer.id !== action.id);
+                    s.layers = s.layers.filter(layer => layer.layerId !== action.layerId);
                     return true;
 
                 case "addTransportTimeCallback":

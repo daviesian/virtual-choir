@@ -63,35 +63,54 @@ class Calibrator extends AudioWorkletProcessor {
             return;
         }
 
+        let ALLOWED_LATENCY_SAMPLE_RANGE = 0.05;
+
+        let sortedSamples = this.samples.slice();
+        sortedSamples.sort();
+
+        let longestSeqStartIdx=0, longestSeqLength=0;
+        for (let i = 0; i < sortedSamples.length; i++) {
+
+            let closeSeqLength = 0;
+            while(i + closeSeqLength < sortedSamples.length && sortedSamples[i+closeSeqLength] < sortedSamples[i] + ALLOWED_LATENCY_SAMPLE_RANGE)
+                closeSeqLength++;
+            if (closeSeqLength > longestSeqLength) {
+                longestSeqLength = closeSeqLength;
+                longestSeqStartIdx = i;
+            }
+        }
+
+        let closeSamples = sortedSamples.slice(longestSeqStartIdx, longestSeqLength);
+
         let mean = 0;
-        for (let s of this.samples) {
+        for (let s of closeSamples) {
             mean += s;
         }
-        mean /= this.samples.length;
+        mean /= closeSamples.length;
 
         let sd = 0;
-        for (let s of this.samples) {
+        for (let s of closeSamples) {
             sd += Math.abs(s - mean);
         }
-        sd /= this.samples.length;
+        sd /= closeSamples.length;
 
-        this.log(`Calibration of ${Math.round(mean*1000)} ms has SD of ${Math.round(sd*1000)} ms with ${this.samples.length} samples.`)
+        this.log(`Calibration of ${Math.round(mean*1000)} ms has SD of ${Math.round(sd*1000)} ms with ${closeSamples.length} samples.`)
 
         this.port.postMessage({
             type: "SAMPLE",
             sample: {
-                latency: this.samples[this.samples.length - 1],
+                latency: this.samples[closeSamples.length - 1],
                 sd,
                 mean,
             },
         });
 
-        if (sd < this.maxSD && this.samples.length >= this.minSamples) {
+        if (sd < this.maxSD && closeSamples.length >= this.minSamples) {
             this.port.postMessage({
                 type: "CALIBRATION",
                 latency: mean,
                 sd,
-                samples: this.samples.length,
+                samples: closeSamples.length,
             });
         }
     }

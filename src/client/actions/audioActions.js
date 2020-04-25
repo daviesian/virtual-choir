@@ -56,9 +56,9 @@ export const loadSingerLayer = (layer) => async (dispatch, getState) => {
         type: "LAYER_ADDED",
         startTime: layer.startTime,
         duration: addedLayer.duration,
-        id: layer.id,
+        layerId: layer.layerId,
         rms: addedLayer.rms,
-        name: "/.layers/" + layer.id, // TODO: Use a nicer name. Username, for example.
+        name: "/.layers/" + layer.layerId, // TODO: Use a nicer name. Username, for example.
         enabled: layer.enabled,
     });
 
@@ -75,13 +75,13 @@ export const updateLayer = (layer, them=false) => async (dispatch, getState) => 
     }
 
     let state = getState();
-    if (layer.enabled && !state.layers.find((l) => l.id === layer.id)) {
+    if (layer.enabled && !state.layers.find((l) => l.layerId === layer.layerId)) {
         await dispatch(loadSingerLayer(layer));
     }
 
     dispatch({
         type: "audio/enableLayer",
-        id: layer.id,
+        layerId: layer.layerId,
         enabled: layer.enabled,
     });
 
@@ -194,22 +194,22 @@ export const stopRecording = (me=true, them=false) => async (dispatch, getState)
 
 };
 
-export const recordingFinished = (id, audioData, startTime) => async (dispatch, getState) => {
+export const recordingFinished = (layerId, audioData, startTime) => async (dispatch, getState) => {
 
     let addedLayer = await dispatch({
         type: "audio/addLayer",
         audioData,
         startTime,
-        id,
+        layerId,
     });
 
     dispatch({
         type: "LAYER_ADDED",
         startTime: startTime,
         duration: addedLayer.duration,
-        id,
+        layerId,
         rms: addedLayer.rms,
-        name: "Layer " + id, // TODO: Use a nicer name. Username, for example.
+        name: "Layer " + layerId, // TODO: Use a nicer name. Username, for example.
         conductor: true,
         enabled: false,
     });
@@ -217,29 +217,29 @@ export const recordingFinished = (id, audioData, startTime) => async (dispatch, 
     await dispatch({
         type: "ws/call",
         fn: "newLayer",
-        kwargs: { id, startTime, backingTrackId: getState().backingTrack.id },
+        kwargs: { layerId, startTime, backingTrackId: getState().backingTrack.backingTrackId },
         data: audioData,
     });
 };
 
-export const deleteLayer = (id, them) => async (dispatch, getState) => {
+export const deleteLayer = (layerId, them) => async (dispatch, getState) => {
 
     if (them) {
         dispatch({
             type: "ws/call",
             fn: "deleteLayer",
-            kwargs: { id },
+            kwargs: { layerId },
         });
     }
 
     await dispatch({
         type: "audio/deleteLayer",
-        id: id,
+        layerId,
     });
 
     dispatch({
         type: "LAYER_DELETED",
-        id: id,
+        layerId,
     });
 };
 

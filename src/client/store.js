@@ -91,7 +91,7 @@ let rootReducer = produce((state, action) => {
             state.backingTrack = {
                 name: action.name,
                 duration: action.duration,
-                id: action.id,
+                backingTrackId: action.backingTrackId,
                 url: action.url,
                 rms: action.rms
             };
@@ -122,11 +122,11 @@ let rootReducer = produce((state, action) => {
             break;
 
         case "LAYER_ADDED":
-            state.layers = state.layers.filter(l => l.id !== action.id);
+            state.layers = state.layers.filter(l => l.layerId !== action.layerId);
             state.layers.push({
                 startTime: action.startTime,
                 duration: action.duration,
-                id: action.id,
+                layerId: action.layerId,
                 name: action.name,
                 rms: action.rms,
                 enabled: action.enabled,
@@ -134,18 +134,18 @@ let rootReducer = produce((state, action) => {
             break;
 
         case "LAYER_UPDATE": {
-            let layer = state.layers.find(({id}) => id === action.layer.id)
+            let layer = state.layers.find(({layerId}) => layerId === action.layer.layerId)
             // TODO: Allow updating more stuff
             if (layer) {
                 layer.enabled = action.layer.enabled;
             } else {
-                throw new Error(`Cannot enable non-existent layer: ${action.layer.id}`);
+                throw new Error(`Cannot enable non-existent layer: ${action.layer.layerId}`);
             }
             break;
         }
 
         case "LAYER_DELETED":
-            state.layers = state.layers.filter(layer => layer.id !== action.id);
+            state.layers = state.layers.filter(layer => layer.layerId !== action.layerId);
             break;
 
         case "SEND_PROGRESS":

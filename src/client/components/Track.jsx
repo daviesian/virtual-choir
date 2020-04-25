@@ -32,7 +32,7 @@ const useStyles = makeStyles(theme => ({
     }
 }));
 
-let Track = ({id, isBackingTrack=false, name, startTime, duration, startTimePercent=0, durationPercent=100, rms, enabled, conducting, dispatch}) => {
+let Track = ({layerId, isBackingTrack=false, name, startTime, duration, startTimePercent=0, durationPercent=100, rms, enabled, conducting, dispatch}) => {
     const classes = useStyles({
         height: 70,
         startTimePercent,
@@ -46,14 +46,14 @@ let Track = ({id, isBackingTrack=false, name, startTime, duration, startTimePerc
         if (isBackingTrack) {
             dispatch(seek(duration * (e.pageX - e.target.getBoundingClientRect().left) / e.target.getBoundingClientRect().width, conducting))
         } else {
-            dispatch(updateLayer({id, enabled: !enabled}, conducting));
+            dispatch(updateLayer({layerId, enabled: !enabled}, conducting));
         }
     });
 
     return <div className={classes.track}>
         <Paper className={classes.layer} elevation={3} onClick={trackClick}>
             <Typography variant="caption">
-                {name}
+                {layerId}
             </Typography>
         </Paper>
     </div>;

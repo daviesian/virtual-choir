@@ -50,7 +50,7 @@ let CalibrationDialog = ({open, onClose, calibration, dispatch}) => {
             <Typography variant="subtitle2">
                 Calibrating audio delay. Please clap with the first of each four beats.
             </Typography>
-            <LinearProgress variant="buffer" value={accuracyPercent} valueBuffer={samplesPercent} className={classes.progress}/>
+            <LinearProgress variant="determinate" value={samplesPercent} className={classes.progress}/>
             <Typography variant="caption">Samples: {calibration?.samples?.length || 0} | Mean latency: {Math.round(calibration?.mean*1000)} ms | SD: {Math.round(calibration?.sd*1000)} ms</Typography>
         </div>;
     } else if (calibration?.calibration) {

@@ -314,20 +314,20 @@ export const stopRecord = () => {
     s.recorderNode.parameters.get("recording").value = 0;
 };
 
-export const addLayer = async (id, startTime, enabled=false, audioData=null) => {
-    audioData = audioData || new Float32Array(await (await fetch(`/.layers/${id}.raw`)).arrayBuffer());
+export const addLayer = async (layerId, startTime, enabled=false, audioData=null) => {
+    audioData = audioData || new Float32Array(await (await fetch(`/.layers/${layerId}.raw`)).arrayBuffer());
 
     let audioBuffer = s.context.createBuffer(1, audioData.length, s.context.sampleRate);
     audioBuffer.copyToChannel(audioData, 0, 0);
     s.layers.push({
         buffer: audioBuffer,
         startTime: startTime,
-        id: id,
+        layerId,
         enabled: enabled,
     });
     return {
         duration: audioBuffer.duration,
-        id: id,
+        layerId,
         rms: await getAudioBufferRMSImageURL(audioBuffer, audioBuffer.duration * 20),
     };
 

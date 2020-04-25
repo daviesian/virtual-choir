@@ -36,7 +36,7 @@ export default store => next => {
 
     let commandHandlers = {
         setUser: ({user}) => {
-            document.location.hash = `userId=${user.id}`;
+            document.location.hash = `userId=${user.userId}`;
             store.dispatch(setUser(user));
         },
         loadBackingTrack: ({track}) => {
@@ -66,8 +66,8 @@ export default store => next => {
         updateLayer: ({layer}) => {
             store.dispatch(updateLayer(layer));
         },
-        deleteLayer: ({id}) => {
-            store.dispatch(deleteLayer(id));
+        deleteLayer: ({layerId}) => {
+            store.dispatch(deleteLayer(layerId));
         }
     };
 

@@ -18,7 +18,7 @@ export const requestJoinRoom = (room) => async (dispatch) => {
         let backingTrack = await dispatch({
             type: "ws/call",
             fn: "getBackingTrack",
-            kwargs: { id: dbRoom.currentBackingTrackId },
+            kwargs: { backingTrackId: dbRoom.currentBackingTrackId },
         });
         await dispatch(loadBackingTrack(backingTrack, false));
 
@@ -90,13 +90,13 @@ export const sendProgress = (transferId, sentBytes, totalBytes) => (dispatch, ge
 };
 
 
-export const loadBackingTrack = ({id, name, url}, conduct = false) => async dispatch => {
+export const loadBackingTrack = ({backingTrackId, name, url}, conduct = false) => async dispatch => {
 
     if (conduct) {
         dispatch({
             type: "ws/call",
             fn: "loadBackingTrack",
-            kwargs: {id},
+            kwargs: {backingTrackId},
         });
     }
 
@@ -107,7 +107,7 @@ export const loadBackingTrack = ({id, name, url}, conduct = false) => async disp
 
     dispatch({
         type: "BACKING_TRACK_LOADED",
-        id,
+        backingTrackId,
         name,
         url,
         duration,
