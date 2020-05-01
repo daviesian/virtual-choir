@@ -4,6 +4,7 @@ import {applyMiddleware, createStore} from 'redux'
 import {createBrowserHistory} from "history";
 import audioMiddleware from './middleware/audio';
 import wsMiddleware from "./middleware/ws";
+import rtcMiddleware from "./middleware/rtc";
 import {produce} from "immer";
 
 const loggerMiddleware = createLogger({
@@ -196,7 +197,8 @@ export const store = createStore(
         loggerMiddleware,
         audioMiddleware,
         wsMiddleware,
+        rtcMiddleware,
     )
 );
 
-window.dispatch = store.dispatch;
+window.store = store;

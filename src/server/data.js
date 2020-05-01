@@ -38,6 +38,7 @@ export const ensureRoomExists = async (roomId) => {
     let room = await db.get(SQL`SELECT * FROM rooms WHERE roomId=${roomId}`);
     if (!room) {
         await db.run(SQL`INSERT INTO rooms (roomId) VALUES (${roomId})`);
+        room = { roomId };
     }
     room.rehearsalState = room.rehearsalState ? JSON.parse(room.rehearsalState) : undefined;
     return room;

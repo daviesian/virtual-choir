@@ -1,5 +1,7 @@
 import {loadSingerLayer} from "./audioActions";
 import parseSRT from 'parse-srt'
+import Peer from 'simple-peer';
+
 
 export const toast = (message, level='info') => ({
     type: "TOAST",
@@ -129,7 +131,12 @@ export const loadBackingTrack = ({backingTrackId, name, url}, conduct = false) =
     });
 
     let lyricsSrt = await (await fetch(url.replace(/\.[^.]*$/, ".srt"))).text();
-    let lyrics = parseSRT(lyricsSrt);
+    let lyrics = [];
+    try {
+        lyrics = parseSRT(lyricsSrt);
+    } catch (e) {
+        console.warn(`Couldn't load lyrics for backing track '${name}'`)
+    }
 
     dispatch({
         type: "BACKING_TRACK_LOADED",
@@ -182,4 +189,76 @@ export const setRehearsalState = (rehearsalState, conduct=false) => async (dispa
         type: "SET_REHEARSAL_STATE",
         rehearsalState,
     });
+}
+
+window.whiteNoise = () => {
+    let canvas = Object.assign(document.createElement("canvas"), {width: 320, height: 240});
+    let ctx = canvas.getContext('2d');
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    let p = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    requestAnimationFrame(function draw(){
+        for (var i = 0; i < p.data.length; i++) {
+            p.data[i++] = p.data[i++] = p.data[i++] = Math.random() * 255;
+        }
+        ctx.putImageData(p, 0, 0);
+        requestAnimationFrame(draw);
+    });
+    return canvas.captureStream(60).getTracks()[0];
+};
+
+export const doWebRTC = () => async dispatch => {
+    window.peer = new Peer();
+
+    peer.on("signalingStateChange", state => {
+        if (state === "have-remote-offer") {
+            peer._pc.getTransceivers()[2].direction = "sendonly";
+
+        }
+    });
+
+
+    peer.on("signal", data => {
+        console.log("SIGNAL", data);
+        dispatch({
+            type: "ws/call",
+            fn: "peerSignal",
+            kwargs: { data },
+        });
+    });
+
+    peer.on("connect", async () => {
+        console.log("CONNECT");
+
+        //let m = await navigator.mediaDevices.getUserMedia({
+        //    video: true,
+        //    audio: false
+        //});
+
+        //window.m = m;
+
+        //debugger;
+
+        //peer.addStream(m);
+
+        //let t = peer._pc.getTransceivers()[2].sender.replaceTrack(m.getVideoTracks()[0]);
+
+    });
+
+    peer.on("track", (a,b,c) => {
+        debugger;
+    });
+
+    peer.on("data", e => {
+        console.log("DATA", e);
+    });
+
+    dispatch({
+        type: "ws/call",
+        fn: "initPeer"
+    });
+
+
+
+
+
 }

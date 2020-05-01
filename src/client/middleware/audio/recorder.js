@@ -23,6 +23,8 @@ class Recorder extends AudioWorkletProcessor {
             this[data.fn].apply(this, data.args);
         };
 
+        this.started = false;
+
         this.log = (...messages)=> this.port.postMessage({type: "LOG", messages});
     }
 
@@ -45,6 +47,20 @@ class Recorder extends AudioWorkletProcessor {
     }
 
     process (inputs, outputs, {recording: [recording]}) {
+
+        // if (!this.started) {
+        //
+        //     let st = Date.now();
+        //     while (Date.now() < st + 5000) {
+        //         let x = new Float32Array(1024);
+        //         let y = new Float32Array(1024);
+        //         for (let j = 0; j < 1024; j++) {
+        //             x.buffer[j] = y.buffer[j];
+        //         }
+        //     }
+        //     this.started = true;
+        //     console.log("STARTED");
+        // }
 
         if (this.recordingStartTime !== null && recording === 0 && this.remainingLatencyBuffersToCapture === null) {
             // We have just stopped recording.

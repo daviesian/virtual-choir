@@ -37,7 +37,7 @@ let App = ({}) => {
     let [launchPopup, setLaunchPopup] = useState(null);
 
     useEffect(() => {(async () => {
-        dispatch(initDevices());
+        window.store.dispatch(initDevices());
 
         setLaunchPopup(await pageInteractionRequired());
     })()},[]);
@@ -45,7 +45,7 @@ let App = ({}) => {
     useEffect(() => {
         if (launchPopup === false) {
             // We have explicitly decided that we're ready for audio. This will happen at most once.
-            dispatch({
+            window.store.dispatch({
                 type: "ws/connect",
             });
         }

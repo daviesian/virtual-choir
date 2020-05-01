@@ -10,7 +10,7 @@ export default store => next => {
             initDevicesPromise = new Promise(async (resolve, reject) => {
                 let devices = await getDevices();
 
-                dispatch({
+                store.dispatch({
                     type: "INIT_AUDIO_DEVICES",
                     inputs: devices.inputs,
                     outputs: devices.outputs,

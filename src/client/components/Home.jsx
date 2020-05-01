@@ -1,7 +1,7 @@
 import * as React from 'react';
 import clsx from 'clsx';
 import {connect} from "react-redux";
-import {useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {
     play,
     stop,
@@ -19,7 +19,7 @@ import ButtonGroup from "@material-ui/core/ButtonGroup";
 import Typography from "@material-ui/core/Typography";
 import List from "@material-ui/core/List";
 import Transport from "./Transport";
-import {loadBackingTrack, setConducting} from "../actions";
+import {doWebRTC, loadBackingTrack, setConducting} from "../actions";
 import LinearProgress from "@material-ui/core/LinearProgress";
 import CalibrationDialog from "./dialogs/Calibration";
 import DeviceSelectionDialog from "./dialogs/DeviceSelection";
@@ -33,6 +33,7 @@ import PeopleIcon from "@material-ui/icons/People";
 import {Switch} from "@material-ui/core";
 import SingerList from "./SingerList";
 import Lyrics from "./Lyrics";
+import {rtcConnect, startSending} from "../actions/rtcActions";
 
 const useStyles = makeStyles(theme => ({
     root: {
@@ -80,11 +81,21 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending,
 
     let [viewSingers, setViewSingers] = useState(true);
 
+    let conductorVideoRef = useRef(null);
+    let choirVideoRef = useRef(null);
+
     useEffect(() => {
         if (user && !user?.name) {
             setProfileOpen(true);
         }
     }, [user?.name]);
+
+    let initRTC = async () => {
+        let {conductorVideo, conductorAudio, choirVideo} = await dispatch(rtcConnect());
+        await dispatch(startSending());
+        conductorVideoRef.current.srcObject = new MediaStream([conductorVideo, conductorAudio]);
+        choirVideoRef.current.srcObject = new MediaStream([choirVideo]);
+    };
 
     return <div className={classes.root}>
         <AppBar className={classes.appBar}>
@@ -104,10 +115,13 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending,
                     <Button onClick={() => dispatch(reset())}>Reset</Button>
                     <Button onClick={() => setDeviceSelectionOpen(true)}>Devices</Button>
                     <Button onClick={() => setCalibrationOpen(true)}>Calibrate</Button>
+                    <Button onClick={initRTC}>WebRTC</Button>
                 </ButtonGroup>
                 <Typography variant={"h5"}>{user?.name}</Typography>
                 {conducting ? <Typography variant="h5">Conductor</Typography> : <Typography variant="h5">Singer</Typography> }
             </div>
+            <video autoPlay={true} ref={conductorVideoRef}/>
+            <video autoPlay={true} ref={choirVideoRef}/>
             <Divider/>
             <ButtonGroup color="primary" variant="contained">
                 <Button onClick={() => dispatch(loadBackingTrack({backingTrackId: "let-it-go", name: "Let It Go", url:"/let-it-go.mp3"}, conducting))}>Load backing track</Button>

@@ -99,6 +99,10 @@
     "webpack-node-externals": "^1.7.2"
   },
   "dependencies": {
-    "regenerator-runtime": "latest"
+    "jpeg-js": "^0.4.0",
+    "regenerator-runtime": "latest",
+    "simple-peer": "^9.7.0",
+    "wrtc": "^0.4.4",
+    "sharp": "0.25.2"
   }
 }

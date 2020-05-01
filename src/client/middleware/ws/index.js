@@ -89,6 +89,12 @@ export default store => next => {
         setRehearsalState: ({rehearsalState}) => {
             store.dispatch(setRehearsalState(rehearsalState));
         },
+        rtcSignal: ({data}) => {
+            store.dispatch({
+                type: "rtc/signal",
+                data,
+            });
+        },
     };
 
     let receiveIncomingMessage = ({data}) => {
@@ -136,6 +142,8 @@ export default store => next => {
         };
 
         window.socket.onmessage = receiveIncomingMessage;
+
+
     };
 
     let sendJSON = async obj => {
