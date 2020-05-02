@@ -47,7 +47,7 @@ let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch}) => 
 
     useEffect(() => {
         if (currentLineRef.current) {
-            currentLineRef.current.scrollIntoView({behavior: 'smooth', block: 'center'});
+            //currentLineRef.current.scrollIntoView({behavior: 'smooth', block: 'center'});
         }
     }, [scrollLine?.id]);
 

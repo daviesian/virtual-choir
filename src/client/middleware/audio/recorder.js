@@ -1,10 +1,3 @@
-let out = (outputs, sampleIndex, val) => {
-    let outputChannels = outputs[0];
-    for (let outputChannelData of outputChannels) {
-        outputChannelData[sampleIndex] = val;
-    }
-};
-
 
 class Recorder extends AudioWorkletProcessor {
 
@@ -48,24 +41,10 @@ class Recorder extends AudioWorkletProcessor {
 
     process (inputs, outputs, {recording: [recording]}) {
 
-        // if (!this.started) {
-        //
-        //     let st = Date.now();
-        //     while (Date.now() < st + 5000) {
-        //         let x = new Float32Array(1024);
-        //         let y = new Float32Array(1024);
-        //         for (let j = 0; j < 1024; j++) {
-        //             x.buffer[j] = y.buffer[j];
-        //         }
-        //     }
-        //     this.started = true;
-        //     console.log("STARTED");
-        // }
-
         if (this.recordingStartTime !== null && recording === 0 && this.remainingLatencyBuffersToCapture === null) {
             // We have just stopped recording.
             this.remainingLatencyBuffersToCapture = this.latencyBufferCount;
-        } else if (this.recordingStartTime !== null && recording === 0 && this.remainingLatencyBuffersToCapture === 0) {
+        } else if (this.recordingStartTime !== null && recording === 0 && this.remainingLatencyBuffersToCapture <= 0) {
             this.remainingLatencyBuffersToCapture = null;
             let buffer = new Float32Array(this.buffers.length * 128);
             for (let i = this.latencyBufferCount; i < this.buffers.length; i++) {
@@ -89,6 +68,28 @@ class Recorder extends AudioWorkletProcessor {
             this.buffers.push(inputData);
             if (this.remainingLatencyBuffersToCapture !== null) {
                 this.remainingLatencyBuffersToCapture--;
+            }
+        }
+
+        if (outputs.length === 1) {
+            for (let input of inputs) {
+                for (let i = 0; i < 128; i++) {
+                    for (let output of outputs[0]) {
+                        output[i] += input[0][i]; // TODO: Stereo.
+                    }
+                }
+
+                // if (input.length === 2) {
+                //     for (let i = 0; i < 128; i++) {
+                //         outputs[0][0][i] += input[0][i];
+                //         outputs[0][1][i] += input[1][i];
+                //     }
+                // } else {
+                //     for (let i = 0; i < 128; i++) {
+                //         outputs[0][0][i] += input[0][i];
+                //         outputs[0][1][i] += input[0][i];
+                //     }
+                // }
             }
         }
 

@@ -95,3 +95,27 @@ export const getLayers = async (roomId, backingTrackId) => {
 export const setRehearsalState = async (roomId, rehearsalState) => {
     return await db.run(SQL`UPDATE rooms SET rehearsalState=${JSON.stringify(rehearsalState)} WHERE roomId=${roomId}`);
 };
+
+export const saveClip = async (clipId, userId, backingTrackId, roomId, startTime, videoMimeType) => {
+    await ensureRoomExists(roomId);
+    await db.run(SQL`INSERT INTO clips (clipId, userId, backingTrackId, roomId, startTime, videoMimeType)
+                     VALUES (${clipId}, ${userId}, ${backingTrackId}, ${roomId}, ${startTime}, ${videoMimeType})`);
+    return await getClip(clipId);
+};
+
+export const getClip = async (clipId) => {
+    return await db.get(SQL`SELECT * FROM clips NATURAL JOIN users WHERE clipId=${clipId}`);
+}
+
+export const getClips = async (roomId, backingTrackId) => {
+    return await db.all(SQL`SELECT * FROM clips NATURAL JOIN users WHERE roomId=${roomId} AND backingTrackId=${backingTrackId}`);
+}
+
+export const deleteClip = async (clipId) => {
+    await db.run(SQL`DELETE FROM clips WHERE clipId=${clipId}`);
+}
+
+export const updateClip = async ({clipId, enabled}) => {
+    await db.run(SQL`UPDATE clips SET enabled=${enabled} WHERE clipId=${clipId}`);
+    return await getClip(clipId);
+}

@@ -4,4 +4,5 @@
 /static/*.mp3
 /.idea
 .layers
+.clips
 choir.db

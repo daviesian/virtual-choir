@@ -110,7 +110,7 @@ export default store => next => {
                     return record();
 
                 case "stopRecording":
-                    if (s.transportStartTime === null || s.recorderNode.parameters.get("recording").value !== 1) {
+                    if (s.transportStartTime === null || s.videoRecorder.state !== "recording") {
                         return false; // Can't stop recording unless we're already recording.
                     }
                     return stopRecord();

@@ -2,7 +2,7 @@ import recorderSrc from '!!raw-loader!babel-loader!./recorder.js';
 import calibratorSrc from '!!raw-loader!babel-loader!./calibrator.js';
 import drifterSrc from '!!raw-loader!babel-loader!./drifter.js';
 
-import {recordingFinished, setTransportTime} from "../../actions/audioActions";
+import {recordingFinished, setTransportTime, videoRecordingFinished} from "../../actions/audioActions";
 import {v4 as uuid} from "uuid";
 import {createAudioWorkletNode} from "./util";
 import s from "./state";
@@ -17,7 +17,7 @@ let scheduleUpcomingLayers = () => {
             log.info("Scheduling layer", layer);
             layer.sourceNode = s.context.createBufferSource();
             layer.sourceNode.buffer = layer.buffer;
-            layer.sourceNode.connect(s.context.destination);
+            layer.sourceNode.connect(s.recorderNode);
             layer.sourceNode.start(s.transportStartTime + layer.startTime);
         }
     }
@@ -76,7 +76,7 @@ export const close = async () => {
         }
         s.context = null;
         s.micStream = null;
-        s.micStreamSourceNode = null;
+        //s.micStreamSourceNode = null;
         s.backingTrackAudioBuffer = null;
 
         s.transportStartTime = null;
@@ -120,38 +120,45 @@ export const init = async (inputId, outputId, dispatch) => {
     }
 
     //s.context2 = new AudioContext({sampleRate: SAMPLE_RATE, latencyHint: "playback"});
+    s.audioOut = new Audio();
+    await s.audioOut.setSinkId(outputId);
     s.context = new AudioContext({sampleRate: SAMPLE_RATE, latencyHint: "playback"});
+    s.sink = s.context.createMediaStreamDestination();
+    s.audioOut.srcObject = s.sink.stream;
+    await s.audioOut.play();
     if (s.context.sampleRate !== SAMPLE_RATE) {
         throw new Error("Could not initialise audio context with correct sample rate.");
     }
-
-    let st = null;// (Date.now()/1000) - s.context.currentTime;
-    let st2 = null;
-    let x = await createAudioWorkletNode(s.context, 'drifter', drifterSrc);
-    x.connect(s.context.destination);
-
-    let lm = performance.now()/1000;
-    x.port.onmessage = (e) => {
-        let t = performance.now() / 1000;
-        let dt = t - lm;
-        lm = t;
-        console.log(`FPS: ${e.data / dt}`);
-    }
-    setInterval(() => {
-        //x.port.postMessage((Date.now()-st)/1000);
-        if (!st) {
-            st = (Date.now()/1000) - s.context.currentTime;
-        } else {
-            //console.log(Math.round(1000 * ((Date.now() / 1000 - st) - s.context.currentTime)));
-        }
-        let ots = s.context.getOutputTimestamp();
-        if (!st2) {
-            st2 = ots.performanceTime/1000 - ots.contextTime;
-        } else {
-            console.log(ots.performanceTime/1000 - ots.contextTime - st2);
-        }
-        //console.log(ots);
-    }, 1000);
+    //
+    // let st = null;// (Date.now()/1000) - s.context.currentTime;
+    // let st2 = null;
+    //
+    // let x = await createAudioWorkletNode(s.context, 'drifter', drifterSrc);
+    // x.connect(s.context.destination);
+    //
+    // let lm = performance.now()/1000;
+    // x.port.onmessage = (e) => {
+    //     let t = performance.now() / 1000;
+    //     let dt = t - lm;
+    //     lm = t;
+    //     console.log(`FPS: ${e.data / dt}`);
+    // }
+    //
+    // setInterval(() => {
+    //     //x.port.postMessage((Date.now()-st)/1000);
+    //     if (!st) {
+    //         st = (Date.now()/1000) - s.context.currentTime;
+    //     } else {
+    //         //console.log(Math.round(1000 * ((Date.now() / 1000 - st) - s.context.currentTime)));
+    //     }
+    //     let ots = s.context.getOutputTimestamp();
+    //     if (!st2) {
+    //         st2 = ots.performanceTime/1000 - ots.contextTime;
+    //     } else {
+    //         console.log(ots.performanceTime/1000 - ots.contextTime - st2);
+    //     }
+    //     //console.log(ots);
+    // }, 1000);
 
     s.micStream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -159,19 +166,47 @@ export const init = async (inputId, outputId, dispatch) => {
             echoCancellation: { exact: false },
             noiseSuppression: { exact: false },
             autoGainControl: { exact: false },
-        }
+        },
+        video: true,
     });
-    s.micStreamSourceNode = s.context.createMediaStreamSource(s.micStream);
+    //s.micStreamSourceNode = s.context.createMediaStreamSource(s.micStream);
+
+    s.videoRecorder = new MediaRecorder(s.micStream);
+
+    s.videoRecorder.onstart = () => {
+        s.recordedVideo = {
+            chunks: [],
+            done: false,
+        };
+        s.recordedAudio = null;
+    };
+
+    s.videoRecorder.ondataavailable = ({data}) => {
+        s.recordedVideo.chunks.push(data);
+    }
+
+    let maybeFinishRecording = () => {
+        if (s.recordedVideo?.done && s.recordedAudio) {
+            dispatch(videoRecordingFinished(uuid(), s.recordedVideo.chunks, s.recordedAudio.audioData, s.recordedAudio.startTime));
+        }
+    };
+
+    s.videoRecorder.onstop = () => {
+        s.recordedVideo.done = true;
+        maybeFinishRecording();
+    }
+
+
 
     try {
         localStorage['selectedInputId'] = inputId;
         localStorage['selectedOutputId'] = outputId;
     } catch (e) { }
 
-    let latencySeconds = getLatency(inputId, outputId);
+    let latencySeconds = 0;//getLatency(inputId, outputId);
 
     s.recorderNode = await createAudioWorkletNode(s.context, 'recorder', recorderSrc, {
-        numberOfOutputs: 0,
+        numberOfOutputs: 1,
         processorOptions: {
             latencySeconds,
         }
@@ -181,7 +216,8 @@ export const init = async (inputId, outputId, dispatch) => {
         switch(data.type) {
             case "RECORDED_DATA":
                 log.info("FROM RECORDER:", data);
-                dispatch(recordingFinished(uuid(), data.audioData, data.startTime))
+                s.recordedAudio = data;
+                maybeFinishRecording();
                 break;
             case "LOG":
                 log.info("RECORDER:", ...data.messages);
@@ -189,6 +225,12 @@ export const init = async (inputId, outputId, dispatch) => {
         }
     };
 
+    s.recorderNode.connect(s.sink);
+
+    var oscillatorNode = s.context.createOscillator();
+    oscillatorNode.connect(s.recorderNode); // To make it run continuously. Ugh.
+
+/*
     s.calibratorNode = await createAudioWorkletNode(s.context, 'calibrator', calibratorSrc, {
         numberOfOutputs: 1,
         processorOptions: {
@@ -247,7 +289,7 @@ export const init = async (inputId, outputId, dispatch) => {
     s.micStreamSourceNode.connect(s.calibratorNode);
 
     s.calibratorNode.connect(s.context.destination);
-
+*/
     // TODO: This doesn't schedule layers if the tab isn't focused.
 
     requestAnimationFrame(function onAnimationFrame() {
@@ -298,7 +340,7 @@ export const loadBackingTrack = async (url) => {
 export const play = startTime => {
     s.backingTrackSourceNode = s.context.createBufferSource();
     s.backingTrackSourceNode.buffer = s.backingTrackAudioBuffer;
-    s.backingTrackSourceNode.connect(s.context.destination);
+    s.backingTrackSourceNode.connect(s.recorderNode);
 
     let preloadTime = 0.05;
     s.transportStartTime = s.context.currentTime + preloadTime - startTime;
@@ -340,13 +382,17 @@ export const seek = time => {
     return false; // Seek failed.
 };
 
-export const record = () => {
+export const record = async() => {
     s.recorderNode.parameters.get("recording").value = 1;
+    s.videoRecorder.start(10000);
     return true;
 };
 
 export const stopRecord = () => {
     s.recorderNode.parameters.get("recording").value = 0;
+    if (s.videoRecorder.state === "recording") {
+        s.videoRecorder.stop();
+    }
     return true;
 };
 

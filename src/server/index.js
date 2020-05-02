@@ -23,7 +23,7 @@ import {
     deleteLayer,
     ensureRoomExists,
     getBackingTrack,
-    openDB,
+    openDB, saveClip,
     saveLayer, setRehearsalState,
     setRoomBackingTrack,
     updateLayer
@@ -332,6 +332,17 @@ let messageHandlers = {
         if (client.peer) {
             client.peer.signal(data);
         }
+    },
+    newClip: async (client, {clipId, backingTrackId, videoBytes, videoMimeType, referenceOutputStartTime}, data) => {
+        requireUuid(clipId);
+        clientLog(client, "New clip:", data.length, "bytes, of which", videoBytes, "bytes are video");
+        fs.mkdirSync(".clips", {recursive: true});
+        fs.writeFileSync(`.clips/${clipId}.mkv`, data.subarray(0,videoBytes));
+        fs.writeFileSync(`.clips/${clipId}.ref`, data.subarray(videoBytes));
+        let clip = await saveClip(clipId, client.user.userId, backingTrackId, client.room.roomId, referenceOutputStartTime, videoMimeType);
+        // if (!client.conducting) {
+        //     client.room.conductor?.sendJSON({cmd: "newSingerLayer", layer});
+        // }
     },
 };
 

@@ -35,16 +35,15 @@ let DeviceSelectionDialog = ({open, onClose, devices, dispatch}) => {
                     <ListItemText primary={d.name} />
                 </ListItem>)}
             </List>
-            {/* Web Audio API doesn't let you choose output devices, and if you pipe it into an <Audio/> tag, the latency is variable. Wow. */}
-            {/*<Divider />*/}
-            {/*<List>*/}
-            {/*    {devices?.outputs.map(d => <ListItem key={d.id} button selected={devices.selectedOutputId === d.id} onClick={() => dispatch(selectOutputDevice(d.id))}>*/}
-            {/*        <ListItemIcon>*/}
-            {/*            <SpeakerIcon />*/}
-            {/*        </ListItemIcon>*/}
-            {/*        <ListItemText primary={d.name} />*/}
-            {/*    </ListItem>)}*/}
-            {/*</List>*/}
+            <Divider />
+            <List>
+                {devices?.outputs.map(d => <ListItem key={d.id} button selected={devices.selectedOutputId === d.id} onClick={() => dispatch(selectOutputDevice(d.id))}>
+                    <ListItemIcon>
+                        <SpeakerIcon />
+                    </ListItemIcon>
+                    <ListItemText primary={d.name} />
+                </ListItem>)}
+            </List>
         </DialogContent>
         <DialogActions>
             <Button variant="contained" onClick={e => { onClose(e);}} autoFocus color="primary">Done</Button>

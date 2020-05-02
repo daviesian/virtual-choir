@@ -235,6 +235,31 @@ export const recordingFinished = (layerId, audioData, startTime) => async (dispa
     });
 };
 
+export const videoRecordingFinished = (clipId, videoFileBlobs, referenceOutputData, referenceOutputStartTime) => async (dispatch, getState) => {
+    let data = new Uint8Array(videoFileBlobs.reduce((totalSize, blob) => totalSize + blob.size, 0) + referenceOutputData.byteLength);
+
+    let ptr = 0;
+    for (let b of videoFileBlobs) {
+        let arr = new Uint8Array(await b.arrayBuffer());
+        data.set(arr, ptr);
+        ptr += arr.byteLength;
+    }
+    data.set(new Uint8Array(referenceOutputData.buffer), ptr);
+
+    await dispatch({
+        type: "ws/call",
+        fn: "newClip",
+        kwargs: {
+            clipId,
+            videoBytes: ptr,
+            videoMimeType: videoFileBlobs[0].type,
+            backingTrackId: getState().backingTrack.backingTrackId,
+            referenceOutputStartTime,
+        },
+        data
+    });
+};
+
 export const deleteLayer = (layerId, them) => async (dispatch, getState) => {
 
     if (them) {
