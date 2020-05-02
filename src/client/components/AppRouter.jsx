@@ -5,24 +5,24 @@ import {requestJoinRoom, requestLeaveRoom, setConducting} from "../actions";
 
 let AppRouter = ({dispatch}) => {
 
-    let roomMatch = useRouteMatch("/:room");
-    let room = roomMatch?.params?.room || "/";
+    let roomMatch = useRouteMatch("/:roomId");
+    let roomId = roomMatch?.params?.roomId || "/";
 
-    let conductMatch = useRouteMatch("/:room/conduct");
+    let conductMatch = useRouteMatch("/:roomId/conduct");
 
-    useEffect(() => {
+    useEffect(() => {(async () => {
 
-        console.warn("RRR", !!room, !!conductMatch);
+        console.warn("RRR", !!roomId, !!conductMatch);
 
-        if (room) {
-            dispatch(requestJoinRoom(room));
+        if (roomId) {
+            await dispatch(requestJoinRoom(roomId));
             if (conductMatch) {
                 dispatch(setConducting(true));
             }
         } else {
             dispatch(requestLeaveRoom());
         }
-    }, [room, !!conductMatch]);
+    })()}, [roomId, !!conductMatch]);
 
     return null;
 };

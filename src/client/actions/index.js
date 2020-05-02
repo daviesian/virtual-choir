@@ -9,14 +9,14 @@ export const toast = (message, level='info') => ({
     message,
 });
 
-export const requestJoinRoom = (room) => async (dispatch) => {
+export const requestJoinRoom = (roomId) => async (dispatch) => {
     let dbRoom = await dispatch({
         type: "ws/call",
         fn: "joinRoom",
-        kwargs: { room },
+        kwargs: { roomId },
     });
 
-    log.info(`Joined room '${room}':`, dbRoom);
+    log.info(`Joined room '${roomId}':`, dbRoom);
     if (dbRoom?.currentBackingTrackId) {
         let backingTrack = await dispatch({
             type: "ws/call",
@@ -28,7 +28,7 @@ export const requestJoinRoom = (room) => async (dispatch) => {
         let layers = await dispatch({
             type: "ws/call",
             fn: "getLayers",
-            kwargs: { roomId: room, backingTrackId: dbRoom.currentBackingTrackId },
+            kwargs: { roomId, backingTrackId: dbRoom.currentBackingTrackId },
         });
         for (let layer of layers) {
             await dispatch(loadSingerLayer(layer))

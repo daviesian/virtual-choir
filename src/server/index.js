@@ -1,6 +1,23 @@
 import {RTCTransceivers} from "../shared";
 
+let video = require("../../build/Release/video.node");
+
+// let ab = new Uint8Array(100);
+//
+// for (let i = 0; i < ab.length; i++) {
+//     ab[i] = i;
+// }
+//
+// video.reverse(ab.buffer);
+//
+// console.log(ab);
+//
+// process.exit(0);
+
 require("regenerator-runtime");
+const {
+    performance
+} = require('perf_hooks');
 
 import {
     deleteLayer,
@@ -45,15 +62,14 @@ app.use(
 app.use(require("webpack-hot-middleware")(compiler));
 
 let clients = {};
+let rooms = {};
 let nextClientId = 0;
-
-let roomVideos = {};
 
 let clientLog = (client, ...args) => {
     log.info(`[Client ${client.clientId}]`, ...args);
 };
 let roomLog = (room, ...args) => {
-    log.info(`[Room ${room}]`, ...args);
+    log.info(`[Room ${room.roomId}]`, ...args);
 };
 
 let requireUuid = uuid => {
@@ -67,29 +83,66 @@ let requireConductor = client => {
     }
 };
 
-let forClientInRoom = (room, fn) => {
-    for (let [peerId, peer] of Object.entries(clients)) {
-        if (peer.room === room) {
-            fn(peer);
-        }
-    }
-
-};
-
 let conduct = (room, obj, data=null) => {
-    forClientInRoom(room, c => {
-        if (!c.conducting) {
-            c.sendJSON(obj);
-        }
-    });
+    for (let c of room.singers) {
+        c.sendJSON(obj);
+    }
 };
 
-let sendToRoomConductor = (room, obj) => {
-    forClientInRoom(room, c => {
-        if (c.conducting) {
-            c.sendJSON(obj);
-        }
-    });
+let clearVideoFrame = frame => {
+    const Y = 192; //238;
+    const U = 128; //136;
+    const V = 128; //119;
+    const uStart = 2 * frame.data.length / 3;
+    const vStart = 5 * frame.data.length / 6;
+    for (let i = 0; i < frame.data.length; i++) {
+        frame.data[i] = i < uStart ? Y : i < vStart ? U : V;
+    }
+}
+
+let getOrCreateRoom = async (roomId) => {
+
+    if (!(roomId in rooms)) {
+        let dbRoom = await ensureRoomExists(roomId);
+
+        let frame = {
+            width: 640,
+            height: 480,
+            data: new Uint8ClampedArray(640 * 480 * 1.5),
+        };
+        let source = new RTCVideoSource();
+
+        rooms[roomId] = {
+            roomId,
+            name: dbRoom.name,
+            currentBackingTrackId: dbRoom.currentBackingTrackId,
+            rehearsalState: dbRoom.rehearsalState,
+
+            clients: [],
+            singers: [],
+            conductor: null,
+
+            video: {
+                frame,
+                source,
+            }
+        };
+
+        const FPS = 30;
+        setTimeout(function f() {
+            if (roomId in rooms) {
+                source.onFrame(frame);
+                setTimeout(f, 1000/FPS)
+            }
+        }, 1000/FPS);
+    }
+    return rooms[roomId];
+}
+
+let maybeDestroyRoom = room => {
+    if (room.singers.length === 0 && !room.conductor) {
+        delete rooms[room.roomId];
+    }
 };
 
 let messageHandlers = {
@@ -97,58 +150,64 @@ let messageHandlers = {
         if (client.user.userId === user.userId) {
             client.user = user;
             await db.updateUser(user);
-            sendToRoomConductor(client.room, {cmd: 'userUpdated', user});
+            client.room.conductor?.sendJSON({cmd: 'userUpdated', user});
         }
     },
-    joinRoom: async (client, {room}) => {
-        client.room = room;
-        let dbRoom = await ensureRoomExists(room);
-        clientLog(client, `Joined room '${room}'`);
-        sendToRoomConductor(client.room, {cmd: "singerJoined", user: client.user});
+    joinRoom: async (client, {roomId}) => {
+        if (!client.room) {
+            client.room = await getOrCreateRoom(roomId);
+            clearVideoFrame(client.room.video.frame);
 
-        if (!roomVideos[room]) {
+            client.room.singers.push(client);
 
-            roomVideos[room] = {
-                frame: { width: 640, height: 480, data: new Uint8ClampedArray(640 * 480 * 4) },
-                source: new RTCVideoSource(),
+            clientLog(client, `Joined room '${roomId}'`);
+            client.room.conductor?.sendJSON({cmd: "singerJoined", user: client.user});
+
+            return {
+                roomId: roomId,
+                name: client.room.name,
+                currentBackingTrackId: client.room.currentBackingTrackId,
+                rehearsalState: client.room.rehearsalState,
             };
-
-            for (let i = 0; i < roomVideos[room].frame.data.length; i++) {
-                roomVideos[room].frame.data[i] = 128;
-            }
-
-            setInterval(() => {
-                const i420Data = new Uint8ClampedArray(640 * 480 * 1.5);
-                const i420Frame = { width: 640, height: 480, data: i420Data };
-                rgbaToI420(roomVideos[room].frame, i420Frame);
-
-                roomVideos[room].source.onFrame(i420Frame);
-            }, 500);
         }
-
-
-
-        return dbRoom;
     },
     leaveRoom: (client) => {
         if (client.room) {
-            clientLog(client, `Left room '${client.room}'`);
-            sendToRoomConductor(client.room, {cmd: "singerLeft", userId: client.user.userId});
+            clientLog(client, `Left room '${client.room.roomId}'`);
+            if (client.room.conductor !== client) {
+                client.room.conductor?.sendJSON({cmd: "singerLeft", userId: client.user.userId});
+            }
+            client.room.singers = client.room.singers.filter(s => s !== client);
+            if (client.room.conductor === client) {
+                client.room.conductor = null;
+            }
+            maybeDestroyRoom(client.room);
+            clearVideoFrame(client.room.video.frame);
             delete client.room;
         }
     },
     conductRoom: (client, { conducting }) => {
         if (conducting) {
             // TODO: Check that this client is allowed to conduct
-            forClientInRoom(client.room, c => { delete c.conducting; });
+            for (let c of client.room.clients) {
+                c.conducting = false;
+            }
             client.conducting = true;
-            forClientInRoom(client.room, c => {
-                sendToRoomConductor(client.room, {cmd: "updateSingerState", user: c.user, state: c.singerState});
-            });
-            clientLog(client, `Conducting room ${client.room}`)
+            client.room.singers = client.room.singers.filter(s => s !== client);
+            if (client.room.conductor && client.room.conductor !== client) {
+                client.room.singers.push(client.room.conductor);
+            }
+            client.room.conductor = client;
+
+            for(let c of client.room.singers) {
+                client.sendJSON({cmd: "updateSingerState", user: c.user, state: c.singerState});
+            }
+            clientLog(client, `Conducting room ${client.room.roomId}`)
         } else if (client.conducting) {
             client.conducting = false;
-            clientLog(client, `No longer conducting room ${client.room}`)
+            client.room.conductor = null;
+            client.room.singers.push(client);
+            clientLog(client, `No longer conducting room ${client.room.roomId}`)
         }
         return true;
     },
@@ -158,7 +217,8 @@ let messageHandlers = {
     loadBackingTrack: async (client, {backingTrackId}) => {
         requireConductor(client);
         roomLog(client.room, `Loading backing track '${backingTrackId}'`);
-        let track = await setRoomBackingTrack(client.room, backingTrackId);
+        let track = await setRoomBackingTrack(client.room.roomId, backingTrackId);
+
         conduct(client.room, {cmd: "loadBackingTrack", track});
     },
     play: (client, {startTime}) => {
@@ -188,16 +248,16 @@ let messageHandlers = {
     },
     singerStateUpdate: (client, {state}) => {
         client.singerState = state;
-        sendToRoomConductor(client.room, {cmd: "updateSingerState", user: client.user, state});
+        client.room.conductor?.sendJSON({cmd: "updateSingerState", user: client.user, state});
     },
     newLayer: async (client, { layerId, startTime, backingTrackId }, audioData) => {
         requireUuid(layerId);
         clientLog(client, "New layer:", audioData.length);
         fs.mkdirSync(".layers", {recursive: true});
         fs.writeFileSync(`.layers/${layerId}.raw`, audioData);
-        let layer = await saveLayer(layerId, client.user.userId, backingTrackId, client.room, startTime);
+        let layer = await saveLayer(layerId, client.user.userId, backingTrackId, client.room.roomId, startTime);
         if (!client.conducting) {
-            sendToRoomConductor(client.room, {cmd: "newSingerLayer", layer});
+            client.room.conductor?.sendJSON({cmd: "newSingerLayer", layer});
         }
     },
     getLayers: async (client, {roomId, backingTrackId}) => {
@@ -236,145 +296,37 @@ let messageHandlers = {
         });
 
         if (!client.conducting) {
-            let conductorVideo = null;
-            let conductorAudio = null;
-            forClientInRoom(client.room, c => {
-                if (c.conducting) {
-                    conductorVideo = c.peer.getTransceiver(RTCTransceivers.MY_VIDEO).receiver.track
-                    conductorAudio = c.peer.getTransceiver(RTCTransceivers.MY_AUDIO).receiver.track
-                }
-            });
-            if (conductorVideo) {
+
+            if (client.room.conductor) {
+                let conductorVideo = client.room.conductor?.peer.getTransceiver(RTCTransceivers.MY_VIDEO).receiver.track
+                let conductorAudio = client.room.conductor?.peer.getTransceiver(RTCTransceivers.MY_AUDIO).receiver.track
                 await client.peer.getTransceiver(RTCTransceivers.CONDUCTOR_VIDEO).sender.replaceTrack(conductorVideo);
                 await client.peer.getTransceiver(RTCTransceivers.CONDUCTOR_AUDIO).sender.replaceTrack(conductorAudio);
             }
 
             let videoSink = new RTCVideoSink(client.peer.getTransceiver(RTCTransceivers.MY_VIDEO).receiver.track);
             videoSink.addEventListener("frame", async ({frame}) => {
-                return;
-                try {
-                    const rgbaData = new Uint8ClampedArray(frame.width * frame.height * 4);
-                    const rgbaFrame = {width: frame.width, height: frame.height, data: rgbaData};
-                    i420ToRgba(frame, rgbaFrame);
+                if (client.room && !client.conducting) {
+                    let myIdx = client.room.singers.indexOf(client);
+                    let gridSize = Math.ceil(Math.sqrt(client.room.singers.length));
+                    let gridX = myIdx % gridSize;
+                    let gridY = Math.floor(myIdx / gridSize);
 
+                    let tileWidth = 640/gridSize;
+                    let tileHeight = 480/gridSize;
 
-                    let img = sharp(Buffer.from(rgbaFrame.data.buffer), {
-                        raw: {
-                            width: frame.width,
-                            height: frame.height,
-                            channels: 4,
-                        }
-                    }).resize(640/4);
-
-                    let totalClientsInRoom = 0;
-                    let thisClientIndexInRoom = 0;
-                    forClientInRoom(client.room, c => {
-                        if (c === client) {
-                            thisClientIndexInRoom = totalClientsInRoom;
-                        }
-                        totalClientsInRoom++;
-                    })
-
-                    let out = await sharp(Buffer.from(roomVideos[client.room].frame.data.buffer), {
-                        raw :{
-                            width: 640,
-                            height: 480,
-                            channels: 4,
-                        }
-                    }).composite([{
-                        input: await img.raw().toBuffer(),
-                        raw :{
-                            width: 640/4,
-                            height: 480/4,
-                            channels: 4,
-                        },
-                        top: Math.floor(thisClientIndexInRoom / 4) * 480/4,
-                        left: Math.floor(thisClientIndexInRoom % 4) * 640/4,
-                    }]).raw().toBuffer();
-
-                    roomVideos[client.room].frame.data = new Uint8ClampedArray(out);
-                } catch (e) {
-                    console.error(e);
+                    try {
+                        //let start = performance.now();
+                        video.i420overlay(frame.data.buffer, client.room.video.frame.data.buffer, frame.width, frame.height, gridX * tileWidth, gridY * tileHeight, tileWidth, tileHeight);
+                        //console.log("Frame processing took", (performance.now() - start).toFixed(3), "ms");
+                    } catch (e) {
+                        console.error(e);
+                    }
                 }
             });
         }
 
-        await client.peer.getTransceiver(RTCTransceivers.CHOIR_VIDEO).sender.replaceTrack(roomVideos[client.room].source.createTrack());
-
-
-
-    },
-    initPeer: async (client) => {
-        client.peer = new Peer({ initiator: true, wrtc });
-        client.peer.addTransceiver('audio');
-        client.peer.addTransceiver('video');
-        client.peer.addTransceiver('video');
-
-        let x = 0;
-        let videoSink = new RTCVideoSink(client.peer._pc.getTransceivers()[2].receiver.track);
-        videoSink.addEventListener("frame", ({frame}) => {
-            if (x++ % 100 !== 0)
-                return;
-
-            console.log("Write frame",x);
-
-            const rgbaData = new Uint8ClampedArray(frame.width * frame.height * 4);
-            const rgbaFrame = { width: frame.width, height: frame.height, data: rgbaData };
-            i420ToRgba(frame, rgbaFrame);
-
-            let jpegImageData = jpeg.encode(rgbaFrame, 75);
-
-            fs.writeFileSync('image.jpg', jpegImageData.data);
-        });
-
-
-        client.peer.on("connect", () => {
-            console.log("CONNECT");
-
-        });
-
-        client.peer.on("data", e => {
-            console.log("DATA", e);
-        });
-
-        client.peer._pc.ontrack = e => {
-            console.log("ONTRACK", e);
-            debugger;
-        }
-
-        client.peer.on("track", (track, stream) => {
-            console.log("TRACK", track);
-
-            client.tracks = client.tracks || [];
-            client.tracks.push(track);
-            debugger;
-            //
-            // let x = 0;
-            //
-            // let videoSink = new RTCVideoSink(track);
-            // videoSink.addEventListener("frame", ({frame}) => {
-            //     if (x++ % 100 !== 0)
-            //         return;
-            //
-            //     const rgbaData = new Uint8ClampedArray(frame.width * frame.height * 4);
-            //     const rgbaFrame = { width: frame.width, height: frame.height, data: rgbaData };
-            //     i420ToRgba(frame, rgbaFrame);
-            //
-            //     let jpegImageData = jpeg.encode(rgbaFrame, 75);
-            //
-            //     fs.writeFileSync('image.jpg', jpegImageData.data);
-            // });
-        });
-
-        client.peer.on("signal", data => {
-            console.log("SIGNAL", data);
-            client.sendJSON({cmd: "peerSignal", data})
-        });
-
-        client.peer.on("error", err => {
-            console.log(err);
-            console.log("Don't panic.")
-        })
+        await client.peer.getTransceiver(RTCTransceivers.CHOIR_VIDEO).sender.replaceTrack(client.room.video.source.createTrack());
     },
     rtcSignal: async (client, {data}) => {
         if (client.peer) {
@@ -475,6 +427,6 @@ let serverRepl = repl.start({
 });
 
 serverRepl.context.clients = clients;
+serverRepl.context.rooms = rooms;
 serverRepl.context.db = db;
-serverRepl.context.roomVideos = roomVideos;
 

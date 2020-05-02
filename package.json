@@ -96,7 +96,9 @@
     "webpack-dev-middleware": "latest",
     "webpack-dev-server": "^3.9.0",
     "webpack-hot-middleware": "^2.25.0",
-    "webpack-node-externals": "^1.7.2"
+    "webpack-node-externals": "^1.7.2",
+    "node-loader": "0.6.0",
+    "node-addon-api": "3.0.0"
   },
   "dependencies": {
     "jpeg-js": "^0.4.0",
