@@ -1,17 +1,47 @@
 
-export const rtcConnect = () => ({
-    type: "rtc/connect",
-});
+export const rtcConnect = () => async (dispatch) => {
+    window.rtcTracks = await dispatch({
+        type: "rtc/connect",
+    });
 
-export const startSending = () => async (dispatch) => {
-    let m = await navigator.mediaDevices.getUserMedia({
-       video: true,
-       audio: true
+    let me = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
     });
 
     await dispatch({
-        type: "rtc/send",
-        myVideo: m.getVideoTracks()[0],
-        myAudio: m.getAudioTracks()[0],
+        type: "rtc/setMe",
+        me,
+    });
+
+    dispatch({
+        type: "RTC_STARTED"
     });
 };
+
+
+export const requestSpeak = (wantsToSpeak) => async (dispatch) => {
+    let speaking = await dispatch({
+        type: "ws/call",
+        fn: "requestSpeak",
+        kwargs: { wantsToSpeak },
+    });
+
+    dispatch({
+        type: "RTC_SPEAKING",
+        speaking
+    });
+}
+
+export const nowSpeaking = (user) => ({
+    type: "NOW_SPEAKING",
+    user,
+});
+
+export const rtcMute = () => ({
+    type: "rtc/mute",
+});
+
+export const rtcUnmute = () => ({
+    type: "rtc/unmute",
+})

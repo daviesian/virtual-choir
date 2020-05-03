@@ -6,5 +6,6 @@ import App from './components/App'
 window.log = log;
 log.setLevel("debug");
 
+window.videos = {};
 
 ReactDOM.render(<App/>, document.getElementById("react-root"));

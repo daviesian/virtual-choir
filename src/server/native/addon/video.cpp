@@ -10,6 +10,37 @@ void log(const Napi::Env env, const std::vector<std::string> msgs) {
     lg.Call(ags);
 }
 
+Napi::Number align(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    auto recordedAudio = info[0].As<Napi::ArrayBuffer>();
+    auto referenceAudio = info[1].As<Napi::ArrayBuffer>();
+
+    float* recordedData = (float*)recordedAudio.Data();
+    float* referenceData = (float*)referenceAudio.Data();
+
+    const int recOrigin = 44100; // Start one second into recording
+    const int windowLength = 44100; // Compare one second
+    const int refLength = referenceAudio.ByteLength() / 4;
+
+    log(env, {"A", std::to_string(recOrigin)});
+
+    long maxSum = LONG_MIN;
+    int maxSumOffset = 0;
+    for(auto i = 0; i < 88200; i++) {
+        long sum = 0;
+        for(auto n = 0; n < windowLength; n++) {
+            sum += recordedData[recOrigin + n] * referenceData[i + n];
+        }
+        if (sum > maxSum) {
+            maxSum = sum;
+            maxSumOffset = i;
+        }
+    }
+
+    return Napi::Number::New(env, (maxSumOffset - recOrigin) / 44100.0);
+}
+
 void i420overlay(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
 
@@ -90,6 +121,7 @@ void i420overlay(const Napi::CallbackInfo& info) {
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
   exports.Set(Napi::String::New(env, "i420overlay"), Napi::Function::New(env, i420overlay));
+  exports.Set(Napi::String::New(env, "align"), Napi::Function::New(env, align));
               
   return exports;
 }

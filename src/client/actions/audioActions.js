@@ -1,4 +1,5 @@
-import {singerState, toast} from "./index";
+import {singerState} from "./index";
+import {rtcMute, rtcUnmute} from "./rtcActions";
 
 export const initDevices = (reload=false) => async dispatch => {
     await dispatch({
@@ -68,6 +69,8 @@ export const loadSingerLayer = (layer) => async (dispatch, getState) => {
         enabled: layer.enabled,
     });
 
+    window.videos[layer.layerId] = `/.layers/${layer.layerId}.vid`;//await (await fetch()).blob();
+
 };
 
 export const updateLayer = (layer, them=false) => async (dispatch, getState) => {
@@ -103,6 +106,7 @@ export const updateLayer = (layer, them=false) => async (dispatch, getState) => 
 
 export const play = (startTime, me=true, them=false) => async (dispatch, getState) => {
 
+    await dispatch(rtcMute());
     if (!await dispatch({type: "audio/play", startTime}))
         return;
 
@@ -144,7 +148,7 @@ export const stop = (me=true, them=false) => async (dispatch, getState) => {
             dispatch(singerState(getState()));
         }
     }
-
+    await dispatch(rtcUnmute());
 
 };
 
@@ -206,36 +210,36 @@ export const stopRecording = (me=true, them=false) => async (dispatch, getState)
         }
     }
 };
+//
+// export const recordingFinished = (layerId, audioData, startTime) => async (dispatch, getState) => {
+//
+//     let addedLayer = await dispatch({
+//         type: "audio/addLayer",
+//         audioData,
+//         startTime,
+//         layerId,
+//     });
+//
+//     dispatch({
+//         type: "LAYER_ADDED",
+//         startTime: startTime,
+//         duration: addedLayer.duration,
+//         layerId,
+//         rms: addedLayer.rms,
+//         name: getState().user.name,
+//         conductor: true,
+//         enabled: false,
+//     });
+//
+//     await dispatch({
+//         type: "ws/call",
+//         fn: "newLayer",
+//         kwargs: { layerId, startTime, backingTrackId: getState().backingTrack.backingTrackId },
+//         data: audioData,
+//     });
+// };
 
-export const recordingFinished = (layerId, audioData, startTime) => async (dispatch, getState) => {
-
-    let addedLayer = await dispatch({
-        type: "audio/addLayer",
-        audioData,
-        startTime,
-        layerId,
-    });
-
-    dispatch({
-        type: "LAYER_ADDED",
-        startTime: startTime,
-        duration: addedLayer.duration,
-        layerId,
-        rms: addedLayer.rms,
-        name: getState().user.name,
-        conductor: true,
-        enabled: false,
-    });
-
-    await dispatch({
-        type: "ws/call",
-        fn: "newLayer",
-        kwargs: { layerId, startTime, backingTrackId: getState().backingTrack.backingTrackId },
-        data: audioData,
-    });
-};
-
-export const videoRecordingFinished = (clipId, videoFileBlobs, referenceOutputData, referenceOutputStartTime) => async (dispatch, getState) => {
+export const recordingFinished = (layerId, videoFileBlobs, referenceOutputData, referenceOutputStartTime, latencyHint) => async (dispatch, getState) => {
     let data = new Uint8Array(videoFileBlobs.reduce((totalSize, blob) => totalSize + blob.size, 0) + referenceOutputData.byteLength);
 
     let ptr = 0;
@@ -246,15 +250,17 @@ export const videoRecordingFinished = (clipId, videoFileBlobs, referenceOutputDa
     }
     data.set(new Uint8Array(referenceOutputData.buffer), ptr);
 
+    // N.B. We're throwing away the video mime type here. Pass it through if we need it.
+
     await dispatch({
         type: "ws/call",
-        fn: "newClip",
+        fn: "newLayer",
         kwargs: {
-            clipId,
+            layerId,
             videoBytes: ptr,
-            videoMimeType: videoFileBlobs[0].type,
             backingTrackId: getState().backingTrack.backingTrackId,
             referenceOutputStartTime,
+            latencyHint,
         },
         data
     });

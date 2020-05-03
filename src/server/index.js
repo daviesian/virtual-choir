@@ -1,34 +1,23 @@
 import {RTCTransceivers} from "../shared";
+import * as db from "./data";
+import {
+    deleteLayer,
+    ensureRoomExists,
+    getBackingTrack,
+    openDB,
+    saveLayer,
+    setRehearsalState,
+    setRoomBackingTrack,
+    updateLayer
+} from "./data";
 
 let video = require("../../build/Release/video.node");
-
-// let ab = new Uint8Array(100);
-//
-// for (let i = 0; i < ab.length; i++) {
-//     ab[i] = i;
-// }
-//
-// video.reverse(ab.buffer);
-//
-// console.log(ab);
-//
-// process.exit(0);
 
 require("regenerator-runtime");
 const {
     performance
 } = require('perf_hooks');
 
-import {
-    deleteLayer,
-    ensureRoomExists,
-    getBackingTrack,
-    openDB, saveClip,
-    saveLayer, setRehearsalState,
-    setRoomBackingTrack,
-    updateLayer
-} from "./data";
-import * as db from "./data"
 const express = require("express");
 const app = express();
 require('express-ws')(app);
@@ -45,21 +34,35 @@ const compiler = webpack(webpackConfig);
 const Peer = require('simple-peer');
 const wrtc = require('wrtc');
 const { RTCAudioSink, RTCVideoSink, RTCVideoSource, RTCAudioSource, i420ToRgba, rgbaToI420 } = wrtc.nonstandard;
-var jpeg = require('jpeg-js');
-const sharp = require('sharp');
+let ffmpeg = require("fluent-ffmpeg");
+
+
+let align = (layerId) => {
+    let recordedAudio = new Float32Array(fs.readFileSync(`.layers/${layerId}.aud`));
+    let referenceAudio = new Float32Array(fs.readFileSync(`.layers/${layerId}.reference.aud`));
+
+    return video.align(recordedAudio.buffer, referenceAudio.buffer);
+}
+//
+// align('b08eead5-4f91-4e43-ba4e-c120c20921a4');
+// process.exit(0);
 
 // Useful background: https://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
 
 log.setDefaultLevel("trace");
-// webpack hmr
-app.use(
-    require("webpack-dev-middleware")(compiler, {
-    noInfo: true,
-    publicPath: webpackConfig.output.publicPath
-})
-);
 
-app.use(require("webpack-hot-middleware")(compiler));
+const WEBPACK = true;
+if (WEBPACK) {
+    // webpack hmr
+    app.use(
+        require("webpack-dev-middleware")(compiler, {
+            noInfo: true,
+            publicPath: webpackConfig.output.publicPath
+        })
+    );
+
+    app.use(require("webpack-hot-middleware")(compiler));
+}
 
 let clients = {};
 let rooms = {};
@@ -121,6 +124,7 @@ let getOrCreateRoom = async (roomId) => {
             clients: [],
             singers: [],
             conductor: null,
+            speaker: null,
 
             video: {
                 frame,
@@ -159,6 +163,7 @@ let messageHandlers = {
             clearVideoFrame(client.room.video.frame);
 
             client.room.singers.push(client);
+            client.room.clients.push(client);
 
             clientLog(client, `Joined room '${roomId}'`);
             client.room.conductor?.sendJSON({cmd: "singerJoined", user: client.user});
@@ -181,12 +186,13 @@ let messageHandlers = {
             if (client.room.conductor === client) {
                 client.room.conductor = null;
             }
+            client.room.clients = client.room.clients.filter(c => c !== client);
             maybeDestroyRoom(client.room);
             clearVideoFrame(client.room.video.frame);
             delete client.room;
         }
     },
-    conductRoom: (client, { conducting }) => {
+    conductRoom: async(client, { conducting }) => {
         if (conducting) {
             // TODO: Check that this client is allowed to conduct
             for (let c of client.room.clients) {
@@ -199,8 +205,14 @@ let messageHandlers = {
             }
             client.room.conductor = client;
 
+            let conductorVideo = client.peer?.getTransceiver(RTCTransceivers.MY_VIDEO).receiver.track
+            let conductorAudio = client.peer?.getTransceiver(RTCTransceivers.MY_AUDIO).receiver.track
             for(let c of client.room.singers) {
                 client.sendJSON({cmd: "updateSingerState", user: c.user, state: c.singerState});
+                if (conductorVideo && c.peer) {
+                    await c.peer.getTransceiver(RTCTransceivers.CONDUCTOR_VIDEO).sender.replaceTrack(conductorVideo);
+                    await c.peer.getTransceiver(RTCTransceivers.CONDUCTOR_AUDIO).sender.replaceTrack(conductorAudio);
+                }
             }
             clientLog(client, `Conducting room ${client.room.roomId}`)
         } else if (client.conducting) {
@@ -250,15 +262,35 @@ let messageHandlers = {
         client.singerState = state;
         client.room.conductor?.sendJSON({cmd: "updateSingerState", user: client.user, state});
     },
-    newLayer: async (client, { layerId, startTime, backingTrackId }, audioData) => {
+    newLayer: async (client, { layerId, videoBytes, backingTrackId, referenceOutputStartTime, latencyHint }, data) => {
         requireUuid(layerId);
-        clientLog(client, "New layer:", audioData.length);
+        clientLog(client, "New layer:", data.length, "bytes, of which", videoBytes, "bytes are video");
         fs.mkdirSync(".layers", {recursive: true});
-        fs.writeFileSync(`.layers/${layerId}.raw`, audioData);
-        let layer = await saveLayer(layerId, client.user.userId, backingTrackId, client.room.roomId, startTime);
-        if (!client.conducting) {
-            client.room.conductor?.sendJSON({cmd: "newSingerLayer", layer});
-        }
+        fs.writeFileSync(`.layers/${layerId}.original.vid`, data.subarray(0,videoBytes));
+        fs.writeFileSync(`.layers/${layerId}.reference.aud`, data.subarray(videoBytes));
+
+        await new Promise((resolve, reject) => ffmpeg(`.layers/${layerId}.original.vid`)
+            // Extract the recorded audio from the video
+            .output(`.layers/${layerId}.aud`)
+            .noVideo()
+            .format("f32le")
+            .audioCodec("pcm_f32le")
+            .audioFrequency(44100)
+            .audioChannels(1)
+            // Strip the audio from the video
+            .output(`.layers/${layerId}.vid`)
+            .noAudio()
+            .videoCodec("copy")
+            .format("matroska")
+            .on('error', reject)
+            .on('end', resolve)
+            .run());
+
+        let offset = -latencyHint;//align(layerId);
+        console.log("Got offset:", offset);
+        let layer = await saveLayer(layerId, client.user.userId, backingTrackId, client.room.roomId, referenceOutputStartTime+offset);
+
+        client.room.conductor?.sendJSON({cmd: "newSingerLayer", layer});
     },
     getLayers: async (client, {roomId, backingTrackId}) => {
         return await db.getLayers(roomId, backingTrackId);
@@ -272,9 +304,12 @@ let messageHandlers = {
     deleteLayer: async (client, {layerId}) => {
         requireUuid(layerId);
         requireConductor(client);
-        conduct(client.room, {cmd: "deleteLayer", layerId});
+        conduct(client.room, {cmd: "deleteClip", layerId});
         await deleteLayer(layerId);
-        try { fs.unlinkSync(`.layers/${layerId}.raw`); } catch (e) { }
+        try { fs.unlinkSync(`.layers/${layerId}.original`); } catch (e) { }
+        try { fs.unlinkSync(`.layers/${layerId}.ref`); } catch (e) { }
+        try { fs.unlinkSync(`.layers/${layerId}.vid`); } catch (e) { }
+        try { fs.unlinkSync(`.layers/${layerId}.aud`); } catch (e) { }
     },
     setRehearsalState: async (client, {roomId, rehearsalState}) => {
         requireConductor(client);
@@ -324,6 +359,15 @@ let messageHandlers = {
                     }
                 }
             });
+        } else {
+            let conductorVideo = client.peer.getTransceiver(RTCTransceivers.MY_VIDEO).receiver.track
+            let conductorAudio = client.peer.getTransceiver(RTCTransceivers.MY_AUDIO).receiver.track
+            for(let c of client.room.singers) {
+                if (conductorVideo && c.peer) {
+                    await c.peer.getTransceiver(RTCTransceivers.CONDUCTOR_VIDEO).sender.replaceTrack(conductorVideo);
+                    await c.peer.getTransceiver(RTCTransceivers.CONDUCTOR_AUDIO).sender.replaceTrack(conductorAudio);
+                }
+            }
         }
 
         await client.peer.getTransceiver(RTCTransceivers.CHOIR_VIDEO).sender.replaceTrack(client.room.video.source.createTrack());
@@ -333,16 +377,25 @@ let messageHandlers = {
             client.peer.signal(data);
         }
     },
-    newClip: async (client, {clipId, backingTrackId, videoBytes, videoMimeType, referenceOutputStartTime}, data) => {
-        requireUuid(clipId);
-        clientLog(client, "New clip:", data.length, "bytes, of which", videoBytes, "bytes are video");
-        fs.mkdirSync(".clips", {recursive: true});
-        fs.writeFileSync(`.clips/${clipId}.mkv`, data.subarray(0,videoBytes));
-        fs.writeFileSync(`.clips/${clipId}.ref`, data.subarray(videoBytes));
-        let clip = await saveClip(clipId, client.user.userId, backingTrackId, client.room.roomId, referenceOutputStartTime, videoMimeType);
-        // if (!client.conducting) {
-        //     client.room.conductor?.sendJSON({cmd: "newSingerLayer", layer});
-        // }
+    requestSpeak: async (client, {wantsToSpeak}) => {
+        if (client.room.speaker && client.room.speaker !== client) {
+            return false;
+        }
+        if (client.peer && !client.conducting) {
+            client.room.speaker = wantsToSpeak ? client : null;
+            let videoTrack = wantsToSpeak ? client.peer.getTransceiver(RTCTransceivers.MY_VIDEO).receiver.track : null;
+            let audioTrack = wantsToSpeak ? client.peer.getTransceiver(RTCTransceivers.MY_AUDIO).receiver.track : null;
+            for(let c of client.room.clients) {
+                if (c.peer) {
+                    await c.peer.getTransceiver(RTCTransceivers.SPEAKER_VIDEO).sender.replaceTrack(videoTrack);
+                    await c.peer.getTransceiver(RTCTransceivers.SPEAKER_AUDIO).sender.replaceTrack(c !== client ? audioTrack : null);
+                    c.sendJSON({cmd: "nowSpeaking", user: wantsToSpeak ? client.user : null});
+
+                }
+            }
+            return wantsToSpeak;
+        }
+        return false;
     },
 };
 

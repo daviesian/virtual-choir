@@ -1,5 +1,5 @@
 import s from './state';
-import {connect, send, signal} from './core';
+import {connect, muteOutput, setMe, signal, unmuteOutput} from './core';
 
 
 window.rtc = s;
@@ -18,8 +18,16 @@ export default store => next => {
                     signal(action.data);
                     break;
 
-                case "send":
-                    await send(action.myVideo, action.myAudio);
+                case "setMe":
+                    await setMe(action.me);
+                    break;
+
+                case "mute":
+                    await muteOutput();
+                    break;
+
+                case "unmute":
+                    await unmuteOutput();
                     break;
 
             }

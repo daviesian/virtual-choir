@@ -70,8 +70,8 @@ export const setRoomBackingTrack = async (roomId, backingTrackId) => {
 
 export const saveLayer = async (layerId, userId, backingTrackId, roomId, startTime) => {
     await ensureRoomExists(roomId);
-    await db.run(SQL`INSERT INTO layers (layerId, userId, backingTrackId, roomId, startTime) 
-                  VALUES (${layerId}, ${userId}, ${backingTrackId}, ${roomId}, ${startTime})`);
+    await db.run(SQL`INSERT INTO layers (layerId, userId, backingTrackId, roomId, startTime)
+                     VALUES (${layerId}, ${userId}, ${backingTrackId}, ${roomId}, ${startTime})`);
     return await getLayer(layerId);
 };
 
@@ -102,20 +102,3 @@ export const saveClip = async (clipId, userId, backingTrackId, roomId, startTime
                      VALUES (${clipId}, ${userId}, ${backingTrackId}, ${roomId}, ${startTime}, ${videoMimeType})`);
     return await getClip(clipId);
 };
-
-export const getClip = async (clipId) => {
-    return await db.get(SQL`SELECT * FROM clips NATURAL JOIN users WHERE clipId=${clipId}`);
-}
-
-export const getClips = async (roomId, backingTrackId) => {
-    return await db.all(SQL`SELECT * FROM clips NATURAL JOIN users WHERE roomId=${roomId} AND backingTrackId=${backingTrackId}`);
-}
-
-export const deleteClip = async (clipId) => {
-    await db.run(SQL`DELETE FROM clips WHERE clipId=${clipId}`);
-}
-
-export const updateClip = async ({clipId, enabled}) => {
-    await db.run(SQL`UPDATE clips SET enabled=${enabled} WHERE clipId=${clipId}`);
-    return await getClip(clipId);
-}

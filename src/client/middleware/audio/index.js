@@ -117,7 +117,7 @@ export default store => next => {
 
                 case "addLayer":
                     await _init();
-                    return await addLayer(action.layerId, action.startTime, action.enabled, action.audioData);
+                    return await addLayer(action.layerId, action.startTime, action.enabled);
 
                 case "enableLayer": {
                     let layer = s.layers.find(({layerId}) => layerId === action.layerId);

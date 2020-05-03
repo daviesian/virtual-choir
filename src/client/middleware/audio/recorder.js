@@ -73,23 +73,18 @@ class Recorder extends AudioWorkletProcessor {
 
         if (outputs.length === 1) {
             for (let input of inputs) {
-                for (let i = 0; i < 128; i++) {
-                    for (let output of outputs[0]) {
-                        output[i] += input[0][i]; // TODO: Stereo.
+
+                if (input.length === 2) {
+                    for (let i = 0; i < 128; i++) {
+                        outputs[0][0][i] += input[0][i];
+                        outputs[0][1][i] += input[1][i];
+                    }
+                } else {
+                    for (let i = 0; i < 128; i++) {
+                        outputs[0][0][i] += input[0][i];
+                        outputs[0][1][i] += input[0][i];
                     }
                 }
-
-                // if (input.length === 2) {
-                //     for (let i = 0; i < 128; i++) {
-                //         outputs[0][0][i] += input[0][i];
-                //         outputs[0][1][i] += input[1][i];
-                //     }
-                // } else {
-                //     for (let i = 0; i < 128; i++) {
-                //         outputs[0][0][i] += input[0][i];
-                //         outputs[0][1][i] += input[0][i];
-                //     }
-                // }
             }
         }
 

@@ -18,6 +18,7 @@ import {
     singerLeft,
     updateSingerState
 } from "../../actions";
+import {nowSpeaking} from "../../actions/rtcActions";
 
 const BINARY_CHUNK_SIZE = 64000;
 
@@ -95,6 +96,15 @@ export default store => next => {
                 data,
             });
         },
+        newSingerClip: ({clip}) => {
+            store.dispatch(loadSingerClip(clip));
+        },
+        deleteClip: ({clipId}) => {
+            store.dispatch(deleteClip(clipId))
+        },
+        nowSpeaking: ({user}) => {
+            store.dispatch(nowSpeaking(user));
+        }
     };
 
     let receiveIncomingMessage = ({data}) => {

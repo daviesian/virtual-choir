@@ -2,7 +2,7 @@ import recorderSrc from '!!raw-loader!babel-loader!./recorder.js';
 import calibratorSrc from '!!raw-loader!babel-loader!./calibrator.js';
 import drifterSrc from '!!raw-loader!babel-loader!./drifter.js';
 
-import {recordingFinished, setTransportTime, videoRecordingFinished} from "../../actions/audioActions";
+import {recordingFinished, setTransportTime} from "../../actions/audioActions";
 import {v4 as uuid} from "uuid";
 import {createAudioWorkletNode} from "./util";
 import s from "./state";
@@ -169,7 +169,7 @@ export const init = async (inputId, outputId, dispatch) => {
         },
         video: true,
     });
-    //s.micStreamSourceNode = s.context.createMediaStreamSource(s.micStream);
+    s.micStreamSourceNode = s.context.createMediaStreamSource(s.micStream);
 
     s.videoRecorder = new MediaRecorder(s.micStream);
 
@@ -187,7 +187,7 @@ export const init = async (inputId, outputId, dispatch) => {
 
     let maybeFinishRecording = () => {
         if (s.recordedVideo?.done && s.recordedAudio) {
-            dispatch(videoRecordingFinished(uuid(), s.recordedVideo.chunks, s.recordedAudio.audioData, s.recordedAudio.startTime));
+            dispatch(recordingFinished(uuid(), s.recordedVideo.chunks, s.recordedAudio.audioData, s.recordedAudio.startTime, getLatency(inputId, outputId)));
         }
     };
 
@@ -207,6 +207,7 @@ export const init = async (inputId, outputId, dispatch) => {
 
     s.recorderNode = await createAudioWorkletNode(s.context, 'recorder', recorderSrc, {
         numberOfOutputs: 1,
+        outputChannelCount: [2],
         processorOptions: {
             latencySeconds,
         }
@@ -230,7 +231,7 @@ export const init = async (inputId, outputId, dispatch) => {
     var oscillatorNode = s.context.createOscillator();
     oscillatorNode.connect(s.recorderNode); // To make it run continuously. Ugh.
 
-/*
+
     s.calibratorNode = await createAudioWorkletNode(s.context, 'calibrator', calibratorSrc, {
         numberOfOutputs: 1,
         processorOptions: {
@@ -285,11 +286,10 @@ export const init = async (inputId, outputId, dispatch) => {
 
     s.calibratorNode.call("setTickBuffers", tickAudioBuffer.getChannelData(0), tockAudioBuffer.getChannelData(0), 0.01, 0.01);
 
-    s.micStreamSourceNode.connect(s.recorderNode);
     s.micStreamSourceNode.connect(s.calibratorNode);
 
-    s.calibratorNode.connect(s.context.destination);
-*/
+    s.calibratorNode.connect(s.sink);
+
     // TODO: This doesn't schedule layers if the tab isn't focused.
 
     requestAnimationFrame(function onAnimationFrame() {
@@ -396,8 +396,8 @@ export const stopRecord = () => {
     return true;
 };
 
-export const addLayer = async (layerId, startTime, enabled=false, audioData=null) => {
-    audioData = audioData || new Float32Array(await (await fetch(`/.layers/${layerId}.raw`)).arrayBuffer());
+export const addLayer = async (layerId, startTime, enabled=false) => {
+    let audioData = new Float32Array(await (await fetch(`/.layers/${layerId}.aud`)).arrayBuffer());
 
     let audioBuffer = s.context.createBuffer(1, audioData.length, s.context.sampleRate);
     audioBuffer.copyToChannel(audioData, 0, 0);

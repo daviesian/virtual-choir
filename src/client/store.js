@@ -28,6 +28,9 @@ const initialState = {
     user: null,
     singers: {},
     rehearsalState: {},
+    rtcStarted: false,
+    speaking: false,
+    speaker: null,
 };
 
 let rootReducer = produce((state, action) => {
@@ -184,6 +187,18 @@ let rootReducer = produce((state, action) => {
         case "SET_REHEARSAL_STATE":
             state.rehearsalState = action.rehearsalState;
 
+            break;
+
+        case "RTC_STARTED":
+            state.rtcStarted = true;
+            break;
+
+        case "RTC_SPEAKING":
+            state.speaking = action.speaking;
+            break;
+
+        case "NOW_SPEAKING":
+            state.speaker = action.user;
             break;
     }
 }, initialState);

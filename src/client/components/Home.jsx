@@ -33,7 +33,7 @@ import PeopleIcon from "@material-ui/icons/People";
 import {Switch} from "@material-ui/core";
 import SingerList from "./SingerList";
 import Lyrics from "./Lyrics";
-import {rtcConnect, startSending} from "../actions/rtcActions";
+import {requestSpeak} from "../actions/rtcActions";
 
 const useStyles = makeStyles(theme => ({
     root: {
@@ -72,7 +72,7 @@ const useStyles = makeStyles(theme => ({
     },
 }));
 
-let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending, user}) => {
+let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending, user, rtcStarted, speaking, speaker}) => {
     const classes = useStyles();
 
     let [calibrationOpen, setCalibrationOpen] = useState(false);
@@ -84,18 +84,22 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending,
     let conductorVideoRef = useRef(null);
     let choirVideoRef = useRef(null);
 
+    let pushToTalk = () => {
+        dispatch(requestSpeak(!speaking));
+    }
+
     useEffect(() => {
         if (user && !user?.name) {
             setProfileOpen(true);
         }
     }, [user?.name]);
 
-    let initRTC = async () => {
-        let {conductorVideo, conductorAudio, choirVideo} = await dispatch(rtcConnect());
-        await dispatch(startSending());
-        conductorVideoRef.current.srcObject = new MediaStream([conductorVideo, conductorAudio]);
-        choirVideoRef.current.srcObject = new MediaStream([choirVideo]);
-    };
+    useEffect(() => {
+        if (rtcStarted) {
+            conductorVideoRef.current.srcObject = new MediaStream([window.rtcTracks.conductorVideo, window.rtcTracks.conductorAudio]);
+            choirVideoRef.current.srcObject = new MediaStream([window.rtcTracks.choirVideo, window.rtcTracks.speakerAudio]);
+        }
+    },[rtcStarted])
 
     return <div className={classes.root}>
         <AppBar className={classes.appBar}>
@@ -115,8 +119,8 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending,
                     <Button onClick={() => dispatch(reset())}>Reset</Button>
                     <Button onClick={() => setDeviceSelectionOpen(true)}>Devices</Button>
                     <Button onClick={() => setCalibrationOpen(true)}>Calibrate</Button>
-                    <Button onClick={initRTC}>WebRTC</Button>
                 </ButtonGroup>
+                {(speaking || !speaker) ? <Button onClick={pushToTalk} color="primary" variant={speaking ? 'contained' : 'outlined'}>{speaking ? 'Mute' : 'Push to talk'}</Button> : <div>Now speaking: {speaker.name}</div>}
                 <Typography variant={"h5"}>{user?.name}</Typography>
                 {conducting ? <Typography variant="h5">Conductor</Typography> : <Typography variant="h5">Singer</Typography> }
             </div>
@@ -166,4 +170,7 @@ export default connect(state => ({
     conducting: state.conducting,
     sending: state.sending,
     user: state.user,
+    rtcStarted: state.rtcStarted,
+    speaking: state.speaking,
+    speaker: state.speaker,
 }))(Home);

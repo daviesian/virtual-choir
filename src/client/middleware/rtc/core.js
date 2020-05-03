@@ -27,6 +27,7 @@ export const connect = async (dispatch) => {
                 conductorVideo: s.peer.getTransceiver(RTCTransceivers.CONDUCTOR_VIDEO).receiver.track,
                 conductorAudio: s.peer.getTransceiver(RTCTransceivers.CONDUCTOR_AUDIO).receiver.track,
                 choirVideo: s.peer.getTransceiver(RTCTransceivers.CHOIR_VIDEO).receiver.track,
+                speakerAudio: s.peer.getTransceiver(RTCTransceivers.SPEAKER_AUDIO).receiver.track,
             });
         });
 
@@ -46,10 +47,11 @@ export const connect = async (dispatch) => {
     });
 }
 
-export const send = async (myVideo=null, myAudio=null) => {
+export const setMe = async (me) => {
+    s.me = me
     if (s.peer) {
-        await s.peer.getTransceiver(RTCTransceivers.MY_VIDEO).sender.replaceTrack(myVideo);
-        await s.peer.getTransceiver(RTCTransceivers.MY_AUDIO).sender.replaceTrack(myAudio);
+        await s.peer.getTransceiver(RTCTransceivers.MY_VIDEO).sender.replaceTrack(me?.getVideoTracks()[0]);
+        await s.peer.getTransceiver(RTCTransceivers.MY_AUDIO).sender.replaceTrack(me?.getAudioTracks()[0]);
     }
 }
 
@@ -57,4 +59,12 @@ export const signal = (data) => {
     if (s.peer) {
         s.peer.signal(data);
     }
+}
+
+export const muteOutput = async () => {
+    await s.peer.getTransceiver(RTCTransceivers.MY_AUDIO).sender.replaceTrack(null);
+}
+
+export const unmuteOutput = async () => {
+    await s.peer.getTransceiver(RTCTransceivers.MY_AUDIO).sender.replaceTrack(s.me?.getAudioTracks()[0]);
 }
