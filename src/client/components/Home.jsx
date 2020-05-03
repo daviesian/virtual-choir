@@ -70,6 +70,11 @@ const useStyles = makeStyles(theme => ({
     track: {
         height: 70
     },
+    video: {
+        width: 320,
+        height: 240,
+        transform: "scaleX(1)",
+    }
 }));
 
 let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending, user, rtcStarted, speaking, speaker}) => {
@@ -124,8 +129,8 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending,
                 <Typography variant={"h5"}>{user?.name}</Typography>
                 {conducting ? <Typography variant="h5">Conductor</Typography> : <Typography variant="h5">Singer</Typography> }
             </div>
-            <video autoPlay={true} ref={conductorVideoRef}/>
-            <video autoPlay={true} ref={choirVideoRef}/>
+            <video className={classes.video} autoPlay={true} ref={conductorVideoRef}/>
+            <video className={classes.video} autoPlay={true} ref={choirVideoRef}/>
             <Divider/>
             <ButtonGroup color="primary" variant="contained">
                 <Button onClick={() => dispatch(loadBackingTrack({backingTrackId: "let-it-go", name: "Let It Go", url:"/let-it-go.mp3"}, conducting))}>Load backing track</Button>

@@ -95,10 +95,3 @@ export const getLayers = async (roomId, backingTrackId) => {
 export const setRehearsalState = async (roomId, rehearsalState) => {
     return await db.run(SQL`UPDATE rooms SET rehearsalState=${JSON.stringify(rehearsalState)} WHERE roomId=${roomId}`);
 };
-
-export const saveClip = async (clipId, userId, backingTrackId, roomId, startTime, videoMimeType) => {
-    await ensureRoomExists(roomId);
-    await db.run(SQL`INSERT INTO clips (clipId, userId, backingTrackId, roomId, startTime, videoMimeType)
-                     VALUES (${clipId}, ${userId}, ${backingTrackId}, ${roomId}, ${startTime}, ${videoMimeType})`);
-    return await getClip(clipId);
-};

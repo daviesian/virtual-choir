@@ -187,6 +187,12 @@ let messageHandlers = {
                 client.room.conductor = null;
             }
             client.room.clients = client.room.clients.filter(c => c !== client);
+            if (client.room.speaker === client) {
+                client.room.speaker = null;
+                for (let c of client.room.clients) {
+                    c.sendJSON({cmd: "nowSpeaking", user: null});
+                }
+            }
             maybeDestroyRoom(client.room);
             clearVideoFrame(client.room.video.frame);
             delete client.room;
@@ -304,10 +310,10 @@ let messageHandlers = {
     deleteLayer: async (client, {layerId}) => {
         requireUuid(layerId);
         requireConductor(client);
-        conduct(client.room, {cmd: "deleteClip", layerId});
+        conduct(client.room, {cmd: "deleteLayer", layerId});
         await deleteLayer(layerId);
-        try { fs.unlinkSync(`.layers/${layerId}.original`); } catch (e) { }
-        try { fs.unlinkSync(`.layers/${layerId}.ref`); } catch (e) { }
+        try { fs.unlinkSync(`.layers/${layerId}.original.vid`); } catch (e) { }
+        try { fs.unlinkSync(`.layers/${layerId}.reference.aud`); } catch (e) { }
         try { fs.unlinkSync(`.layers/${layerId}.vid`); } catch (e) { }
         try { fs.unlinkSync(`.layers/${layerId}.aud`); } catch (e) { }
     },
