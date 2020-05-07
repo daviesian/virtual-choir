@@ -71,12 +71,12 @@ export const getDevices = async () => {
 export const close = async () => {
     if (s.context) {
         s.context.close();
-        for (let t of s.micStream?.getTracks() || []) {
+        for (let t of s.inputStream?.getTracks() || []) {
             t.stop();
         }
         s.context = null;
-        s.micStream = null;
-        //s.micStreamSourceNode = null;
+        s.inputStream = null;
+        //s.inputStreamSourceNode = null;
         s.backingTrackAudioBuffer = null;
 
         s.transportStartTime = null;
@@ -119,48 +119,17 @@ export const init = async (inputId, outputId, dispatch) => {
         return;
     }
 
-    //s.context2 = new AudioContext({sampleRate: SAMPLE_RATE, latencyHint: "playback"});
     s.audioOut = new Audio();
     await s.audioOut.setSinkId(outputId);
     s.context = new AudioContext({sampleRate: SAMPLE_RATE, latencyHint: "playback"});
-    s.sink = s.context.createMediaStreamDestination();
+    s.sink = /*s.context.destination; //*/s.context.createMediaStreamDestination();
     s.audioOut.srcObject = s.sink.stream;
     await s.audioOut.play();
     if (s.context.sampleRate !== SAMPLE_RATE) {
         throw new Error("Could not initialise audio context with correct sample rate.");
     }
-    //
-    // let st = null;// (Date.now()/1000) - s.context.currentTime;
-    // let st2 = null;
-    //
-    // let x = await createAudioWorkletNode(s.context, 'drifter', drifterSrc);
-    // x.connect(s.context.destination);
-    //
-    // let lm = performance.now()/1000;
-    // x.port.onmessage = (e) => {
-    //     let t = performance.now() / 1000;
-    //     let dt = t - lm;
-    //     lm = t;
-    //     console.log(`FPS: ${e.data / dt}`);
-    // }
-    //
-    // setInterval(() => {
-    //     //x.port.postMessage((Date.now()-st)/1000);
-    //     if (!st) {
-    //         st = (Date.now()/1000) - s.context.currentTime;
-    //     } else {
-    //         //console.log(Math.round(1000 * ((Date.now() / 1000 - st) - s.context.currentTime)));
-    //     }
-    //     let ots = s.context.getOutputTimestamp();
-    //     if (!st2) {
-    //         st2 = ots.performanceTime/1000 - ots.contextTime;
-    //     } else {
-    //         console.log(ots.performanceTime/1000 - ots.contextTime - st2);
-    //     }
-    //     //console.log(ots);
-    // }, 1000);
 
-    s.micStream = await navigator.mediaDevices.getUserMedia({
+    s.inputStream = await navigator.mediaDevices.getUserMedia({
         audio: {
             deviceId: { exact: inputId },
             echoCancellation: { exact: false },
@@ -169,11 +138,11 @@ export const init = async (inputId, outputId, dispatch) => {
         },
         video: true,
     });
-    s.micStreamSourceNode = s.context.createMediaStreamSource(s.micStream);
+    s.inputStreamSourceNode = s.context.createMediaStreamSource(s.inputStream);
 
-    s.videoRecorder = new MediaRecorder(s.micStream);
+    s.mediaRecorder = new MediaRecorder(s.inputStream);
 
-    s.videoRecorder.onstart = () => {
+    s.mediaRecorder.onstart = () => {
         s.recordedVideo = {
             chunks: [],
             done: false,
@@ -181,7 +150,7 @@ export const init = async (inputId, outputId, dispatch) => {
         s.recordedAudio = null;
     };
 
-    s.videoRecorder.ondataavailable = ({data}) => {
+    s.mediaRecorder.ondataavailable = ({data}) => {
         s.recordedVideo.chunks.push(data);
     }
 
@@ -191,7 +160,7 @@ export const init = async (inputId, outputId, dispatch) => {
         }
     };
 
-    s.videoRecorder.onstop = () => {
+    s.mediaRecorder.onstop = () => {
         s.recordedVideo.done = true;
         maybeFinishRecording();
     }
@@ -286,7 +255,7 @@ export const init = async (inputId, outputId, dispatch) => {
 
     s.calibratorNode.call("setTickBuffers", tickAudioBuffer.getChannelData(0), tockAudioBuffer.getChannelData(0), 0.01, 0.01);
 
-    s.micStreamSourceNode.connect(s.calibratorNode);
+    s.inputStreamSourceNode.connect(s.calibratorNode);
 
     s.calibratorNode.connect(s.sink);
 
@@ -384,14 +353,14 @@ export const seek = time => {
 
 export const record = async() => {
     s.recorderNode.parameters.get("recording").value = 1;
-    s.videoRecorder.start(10000);
+    s.mediaRecorder.start(10000);
     return true;
 };
 
 export const stopRecord = () => {
     s.recorderNode.parameters.get("recording").value = 0;
-    if (s.videoRecorder.state === "recording") {
-        s.videoRecorder.stop();
+    if (s.mediaRecorder.state === "recording") {
+        s.mediaRecorder.stop();
     }
     return true;
 };

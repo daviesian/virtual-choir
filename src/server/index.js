@@ -38,13 +38,15 @@ let ffmpeg = require("fluent-ffmpeg");
 
 
 let align = (layerId) => {
-    let recordedAudio = new Float32Array(fs.readFileSync(`.layers/${layerId}.aud`));
-    let referenceAudio = new Float32Array(fs.readFileSync(`.layers/${layerId}.reference.aud`));
+    let micBuffer = fs.readFileSync(`.layers/${layerId}.aud`)
+    let recordedAudio = new Float32Array(micBuffer.buffer, 0, micBuffer.byteLength / 4);
+    let referenceBuffer = fs.readFileSync(`.layers/${layerId}.reference.aud`);
+    let referenceAudio = new Float32Array(referenceBuffer.buffer, 0, referenceBuffer.byteLength / 4);
 
     return video.align(recordedAudio.buffer, referenceAudio.buffer);
 }
-//
-// align('b08eead5-4f91-4e43-ba4e-c120c20921a4');
+
+// console.log(align('75fcaf99-1640-45b7-af9a-4308fc2921f4'));
 // process.exit(0);
 
 // Useful background: https://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
@@ -292,8 +294,8 @@ let messageHandlers = {
             .on('end', resolve)
             .run());
 
-        let offset = -latencyHint;//align(layerId);
-        console.log("Got offset:", offset);
+        let offset = align(layerId);
+        console.log("Got offset:", offset.toFixed(3), "s");
         let layer = await saveLayer(layerId, client.user.userId, backingTrackId, client.room.roomId, referenceOutputStartTime+offset);
 
         client.room.conductor?.sendJSON({cmd: "newSingerLayer", layer});

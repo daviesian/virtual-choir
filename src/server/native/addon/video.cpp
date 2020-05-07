@@ -23,12 +23,10 @@ Napi::Number align(const Napi::CallbackInfo& info) {
     const int windowLength = 44100; // Compare one second
     const int refLength = referenceAudio.ByteLength() / 4;
 
-    log(env, {"A", std::to_string(recOrigin)});
-
-    long maxSum = LONG_MIN;
+    float maxSum = 0;
     int maxSumOffset = 0;
-    for(auto i = 0; i < 88200; i++) {
-        long sum = 0;
+    for(auto i = 0; i < 88200; i++) { // Search the first three seconds of reference audio
+        float sum = 0;
         for(auto n = 0; n < windowLength; n++) {
             sum += recordedData[recOrigin + n] * referenceData[i + n];
         }
@@ -38,7 +36,9 @@ Napi::Number align(const Napi::CallbackInfo& info) {
         }
     }
 
-    return Napi::Number::New(env, (maxSumOffset - recOrigin) / 44100.0);
+    log(env, {"MaxSumOffset", std::to_string(maxSumOffset), std::to_string(maxSum)});
+
+    return Napi::Number::New(env, (maxSumOffset - recOrigin) / 44100.0); // Return the offset in seconds
 }
 
 void i420overlay(const Napi::CallbackInfo& info) {
