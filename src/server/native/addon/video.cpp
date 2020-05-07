@@ -23,12 +23,22 @@ Napi::Number align(const Napi::CallbackInfo& info) {
     const int windowLength = 44100; // Compare one second
     const int refLength = referenceAudio.ByteLength() / 4;
 
-    float maxSum = 0;
+    int recordedWindow[44100];
+    int referenceWindow[132300];
+
+    for (auto i = 0; i < 44100; i++) {
+        recordedWindow[i] = (int)(recordedData[recOrigin+i] * 255);
+    }
+    for (auto i = 0; i < 132300; i++) {
+        referenceWindow[i] = (int)(referenceData[i] * 255);
+    }
+
+    long long maxSum = 0;
     int maxSumOffset = 0;
     for(auto i = 0; i < 88200; i++) { // Search the first three seconds of reference audio
-        float sum = 0;
+        long long sum = 0;
         for(auto n = 0; n < windowLength; n++) {
-            sum += recordedData[recOrigin + n] * referenceData[i + n];
+            sum += recordedWindow[n] * referenceWindow[i + n];
         }
         if (sum > maxSum) {
             maxSum = sum;

@@ -335,7 +335,9 @@ let messageHandlers = {
         });
 
         client.peer.on("error", err => {
-            console.error(err);
+            if (err.message !== "Ice connection failed.") {
+                console.error(err);
+            }
         });
 
         if (!client.conducting) {
