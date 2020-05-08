@@ -18,6 +18,7 @@ import Dialog from "@material-ui/core/Dialog";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogTitle from "@material-ui/core/DialogTitle";
 import DialogActions from "@material-ui/core/DialogActions";
+import Main from "./Main";
 
 setConfig({
     reloadHooks: false,
@@ -29,6 +30,7 @@ const theme = createMuiTheme({
         background: { default: blue['50'] },
         primary: blue,
         secondary: orange,
+        foo: orange,
     }
 });
 
@@ -59,7 +61,7 @@ let App = ({}) => {
                     {launchPopup ? <Dialog open={true}>
                         <DialogTitle>Welcome to the Choir!</DialogTitle>
                         <DialogActions><Button variant="contained" color="primary" onClick={async () => setLaunchPopup(await pageInteractionRequired())}>Get started</Button></DialogActions>
-                    </Dialog> : <Home/>}
+                    </Dialog> : <Main/>}
                 </SnackbarProvider>
             </ThemeProvider>
             <AppRouter/>

@@ -14,19 +14,11 @@ import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
 import { green, red } from '@material-ui/core/colors';
 import clsx from "clsx";
 import {CircularProgress} from "@material-ui/core";
-
-const DRAWER_WIDTH = 240;
+import Paper from "@material-ui/core/Paper";
+import ListSubheader from "@material-ui/core/ListSubheader";
+import Divider from "@material-ui/core/Divider";
 
 const useStyles = makeStyles(theme => ({
-    drawer: {
-        position: 'relative',
-        width: DRAWER_WIDTH,
-        flexShrink: 0,
-    },
-
-    drawerPaper: {
-        width: DRAWER_WIDTH,
-    },
     play: {
         color: 'white',
         backgroundColor: green[500],
@@ -44,15 +36,11 @@ const useStyles = makeStyles(theme => ({
     },
 }));
 
-let SingerList = ({open, singers, user, dispatch}) => {
-
-    if (!user) {
-        return null;
-    }
+let Sidebar = ({singers, user, dispatch}) => {
 
     let classes = useStyles();
 
-    let singerList = Object.entries(singers).filter(([userId, singer]) => userId !== user.userId).map(([userId, singer]) => {
+    let singerList = Object.entries(singers).filter(([userId, singer]) => userId !== user?.userId).map(([userId, singer]) => {
         let s = {...singer};
         let sends = Object.entries(s.state?.sending || {});
         s.uploadProgress = null;
@@ -62,10 +50,23 @@ let SingerList = ({open, singers, user, dispatch}) => {
         return s;
     });
 
-    return <Drawer open={open} anchor='left' className={classes.drawer} variant='persistent'  classes={{paper: classes.drawerPaper}}>
-        <Toolbar/> {/* Spacing underneath the AppBar */}
+    return <Paper style={{minHeight:0, overflow:"auto"}}>
         <List>
-            Hello
+            <ListItem>
+                {<ListItemAvatar>
+                    <Avatar className={clsx({
+                        [classes.play]: false,
+                        [classes.record]: false,
+                        [classes.pause]: true,
+                    })}>
+                        <PauseIcon/>
+                    </Avatar>
+                </ListItemAvatar>}
+                <ListItemText primary={"Conductor Name"} secondary={"Conductor"}/>
+                <CircularProgress size={50} className={classes.uploadProgress} variant="static" value={0}/>
+            </ListItem>
+            <Divider/>
+
             {singerList.map(singer =>
                 <ListItem key={singer.user.userId}>
                     {<ListItemAvatar>
@@ -83,10 +84,11 @@ let SingerList = ({open, singers, user, dispatch}) => {
             }
 
         </List>
-    </Drawer>;
+    </Paper>;
 }
 
 export default connect(state => ({
     singers: state.singers,
+    conductor: state.conductor,
     user: state.user,
-}))(SingerList);
+}))(Sidebar);

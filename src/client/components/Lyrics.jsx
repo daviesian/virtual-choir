@@ -8,16 +8,18 @@ import {makeStyles} from "@material-ui/core/styles";
 import {useCallback, useEffect, useRef} from "react";
 import {setRehearsalState} from "../actions";
 import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import Paper from "@material-ui/core/Paper";
 
 const useStyles = makeStyles(theme => ({
     lyricsBlock: {
-        height: 300,
         overflowY: "auto",
+        margin: [[0, "auto"]],
+        width: "max-content",
     }
 }));
 
 
-let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch}) => {
+let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch, ...props}) => {
     let classes = useStyles();
 
     let currentLineRef = useRef();
@@ -51,13 +53,16 @@ let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch}) => 
         }
     }, [scrollLine?.id]);
 
-    return <List className={classes.lyricsBlock}>
-        {lyricLines}
-    </List>;
+    return <Paper square elevation={0} style={{minHeight: 0, overflow: 'auto'}}>
+        <List className={classes.lyricsBlock}>
+            {lyricLines}
+        </List>
+    </Paper>;
 };
 
 export default connect(state => ({
     conducting: state.conducting,
     transportTime: state.transport?.currentTime,
     rehearsalState: state.rehearsalState,
+    lyrics: state.backingTrack?.lyrics,
 }))(Lyrics);

@@ -1,44 +1,58 @@
 import * as React from 'react';
 import {connect} from "react-redux";
-import List from "@material-ui/core/List";
-import Track from "./Track";
-import {makeStyles} from "@material-ui/core/styles";
-import TransportCursor from "./TransportCursor";
+import Paper from "@material-ui/core/Paper";
+import makeStyles from "@material-ui/core/styles/makeStyles";
+import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import SkipPreviousIcon from "@material-ui/icons/SkipPrevious";
+import FiberManualRecordIcon from '@material-ui/icons/FiberManualRecord';
+import Fab from "@material-ui/core/Fab";
+import green from "@material-ui/core/colors/green";
+import blueGrey from "@material-ui/core/colors/blueGrey";
+import red from "@material-ui/core/colors/red";
 
-const useStyles = makeStyles(theme => ({
-    root: {
-        overflowX: 'auto',
-        overflowY: 'hidden',
-        position: "relative",
+let useStyles = makeStyles(theme => ({
+    controls: {
+        width: 'max-content',
+        margin: [[theme.spacing(3), 'auto']],
     },
-    trackList: {
-        width: ({backingTrack}) => backingTrack.duration * 20,
-        position: "relative",
-        '& > *': {
-            margin: [[theme.spacing(1), 0]],
-        },
+    playButton: {
+        backgroundColor: green[500],
+        color: 'white',
+        margin: [[0, theme.spacing(3)]],
+    },
+    rewindButton: {
+        backgroundColor: blueGrey[500],
+        color: 'white',
+    },
+    recordButton: {
+        backgroundColor: red[500],
+        color: 'white',
+    },
+    track: {
+        backgroundImage: ({rms}) => `url(${rms})`,
+        backgroundSize: "contain",
+        height: 50,
     }
 }));
 
-let Transport = ({backingTrack, tracks=[], transportTime, rehearsalState, dispatch}) => {
-    if (!backingTrack)
-        return null;
+const Transport = ({backingTrack}) => {
 
-    const classes = useStyles({
-        backingTrack
+    let classes = useStyles({
+        rms: backingTrack?.rms
     });
 
-    return <div className={classes.root}>
-        <List className={classes.trackList}>
-            <Track isBackingTrack={true} {...backingTrack}/>
-            {tracks.map(t => <Track key={t.layerId} enabled={t.enabled} startTime={t.startTime} duration={t.duration} startTimePercent={100*t.startTime / backingTrack.duration} durationPercent={100*t.duration / backingTrack.duration} {...t}/>)}
-            {transportTime!==null && <TransportCursor line={true}  timePercent={100*transportTime / backingTrack.duration}/>}
-            {rehearsalState?.cursor && <TransportCursor line={false} arrow={true} timePercent={100*rehearsalState.cursor / backingTrack.duration}/>}
-        </List>
-    </div>
+    return <Paper square elevation={0}>
+        <div className={classes.controls}>
+            <Fab className={classes.rewindButton} size={'small'}><SkipPreviousIcon/></Fab>
+            <Fab className={classes.playButton}><PlayArrowIcon/></Fab>
+            <Fab className={classes.recordButton} size={'small'}><FiberManualRecordIcon fontSize={'small'}/></Fab>
+        </div>
+        <div>
+            <Paper className={classes.track}/>
+        </div>
+    </Paper>;
 };
 
-export default connect(state =>({
-    transportTime: state.transport.currentTime,
-    rehearsalState: state.rehearsalState,
+export default connect(state => ({
+    backingTrack: state.backingTrack
 }))(Transport);

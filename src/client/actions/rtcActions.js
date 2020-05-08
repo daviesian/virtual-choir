@@ -1,6 +1,6 @@
 
 export const rtcConnect = () => async (dispatch) => {
-    window.rtcTracks = await dispatch({
+    let rtcTracks = await dispatch({
         type: "rtc/connect",
     });
 
@@ -13,6 +13,12 @@ export const rtcConnect = () => async (dispatch) => {
         type: "rtc/setMe",
         me,
     });
+
+    window.rtcTracks = {
+        myVideo: me.getVideoTracks()[0],
+        myAudio: me.getAudioTracks()[0],
+        ...rtcTracks,
+    };
 
     dispatch({
         type: "RTC_STARTED"

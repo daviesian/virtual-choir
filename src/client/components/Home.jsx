@@ -18,7 +18,7 @@ import Button from "@material-ui/core/Button";
 import ButtonGroup from "@material-ui/core/ButtonGroup";
 import Typography from "@material-ui/core/Typography";
 import List from "@material-ui/core/List";
-import Transport from "./Transport";
+import Transport from "./Layers";
 import {doWebRTC, loadBackingTrack, setConducting} from "../actions";
 import LinearProgress from "@material-ui/core/LinearProgress";
 import CalibrationDialog from "./dialogs/Calibration";
@@ -38,17 +38,23 @@ import {requestSpeak} from "../actions/rtcActions";
 const useStyles = makeStyles(theme => ({
     root: {
         display: 'flex',
+        height: "100%",
+        overflow: "hidden",
+        //position: 'relative',
+        //alignItems: "stretch"
     },
     main: {
         flexGrow: 1,
-        padding: 10,
+        padding: 0,
+        height: "auto",
         overflow: 'hidden',
         '& > *': {
             margin: theme.spacing(1)
-        }
+        },
+        display: "flex",
     },
     mainExpand: {
-        marginRight: -240,
+        marginLeft: -240,
     },
     appBar: {
         zIndex: theme.zIndex.drawer + 1,
@@ -116,6 +122,8 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending,
                 </>}
             </Toolbar>
         </AppBar>
+        {conducting && <SingerList open={viewSingers}/>}
+
         <main className={clsx(classes.main, {[classes.mainExpand]: !viewSingers})}>
             <Toolbar/>
             <div className={classes.header}>
@@ -159,11 +167,9 @@ let Home = ({dispatch, backingTrack, transportTime, layers, conducting, sending,
 
             <CalibrationDialog open={calibrationOpen} onClose={() => setCalibrationOpen(false)}/>
             <DeviceSelectionDialog open={deviceSelectionOpen} onClose={() => setDeviceSelectionOpen(false)}/>
-            <ProfileDialog open={profileOpen} user={user} onClose={() => setProfileOpen(false)}/>
 
         </main>
 
-        {conducting && <SingerList open={viewSingers}/>}
 
     </div>;
 };
