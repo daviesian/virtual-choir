@@ -15,11 +15,10 @@ const loggerMiddleware = createLogger({
 const initialState = {
     audioInitialised: false,
     backingTrack: null,
-    layers: [],
+    //layers: [],
     transport: {
         currentTime: 0,
-        playing: false,
-        recording: false,
+        state: null,
     },
     conducting: false,
     sending: {},
@@ -31,6 +30,7 @@ const initialState = {
     rtcStarted: false,
     speaking: false,
     speaker: null,
+    targetLaneId: null,
 };
 
 let rootReducer = produce((state, action) => {
@@ -93,15 +93,28 @@ let rootReducer = produce((state, action) => {
             delete state.calibration;
             return;
 
-        case "BACKING_TRACK_LOADED":
-            state.backingTrack = {
-                name: action.name,
-                duration: action.duration,
-                backingTrackId: action.backingTrackId,
-                url: action.url,
-                rms: action.rms,
-                lyrics: action.lyrics,
-            };
+        case "PROJECT_LOADED":
+            // state.project = {
+            //     name: action.name,
+            //     duration: action.duration,
+            //     backingTrackId: action.backingTrackId,
+            //     url: action.url,
+            //     rms: action.rms,
+            //     lyrics: action.lyrics,
+            // };
+            state.project = action.project;
+            state.lanes = {};
+            for (let lane of action.lanes || []) {
+                state.lanes[lane.id] = lane;
+            }
+            state.items = {};
+            for (let item of action.items || []) {
+                state.items[item.id] = item;
+            }
+            break;
+
+        case "LANE_ADDED":
+            state.lanes[action.lane.id] = action.lane;
             break;
 
         case "SEEK":
@@ -113,48 +126,43 @@ let rootReducer = produce((state, action) => {
             break;
 
         case "PLAYBACK_STARTED":
-            state.transport.playing = true;
-            break;
-
-        case "PLAYBACK_STOPPED":
-            state.transport.playing = false;
-            state.transport.recording = false;
+            state.transport.state = 'playing';
             break;
 
         case "RECORDING_STARTED":
-            state.transport.recording = true;
+            state.transport.state = 'recording';
             break;
 
-        case "RECORDING_STOPPED":
-            state.transport.recording = false;
+        case "STOPPED":
+            state.transport.state = null;
             break;
 
-        case "LAYER_ADDED":
-            state.layers = state.layers.filter(l => l.layerId !== action.layerId);
-            state.layers.push({
-                startTime: action.startTime,
-                duration: action.duration,
-                layerId: action.layerId,
-                name: action.name,
-                rms: action.rms,
-                enabled: action.enabled,
-            });
-            break;
-
-        case "LAYER_UPDATE": {
-            let layer = state.layers.find(({layerId}) => layerId === action.layer.layerId)
-            // TODO: Allow updating more stuff
-            if (layer) {
-                layer.enabled = action.layer.enabled;
-            } else {
-                throw new Error(`Cannot enable non-existent layer: ${action.layer.layerId}`);
-            }
-            break;
-        }
-
-        case "LAYER_DELETED":
-            state.layers = state.layers.filter(layer => layer.layerId !== action.layerId);
-            break;
+        // case "LAYER_ADDED":
+        //     state.layers = state.layers.filter(l => l.layerId !== action.layerId);
+        //     state.layers.push({
+        //         startTime: action.startTime,
+        //         duration: action.duration,
+        //         layerId: action.layerId,
+        //         name: action.name,
+        //         rms: action.rms,
+        //         enabled: action.enabled,
+        //     });
+        //     break;
+        //
+        // case "LAYER_UPDATE": {
+        //     let layer = state.layers.find(({layerId}) => layerId === action.layer.layerId)
+        //     // TODO: Allow updating more stuff
+        //     if (layer) {
+        //         layer.enabled = action.layer.enabled;
+        //     } else {
+        //         throw new Error(`Cannot enable non-existent layer: ${action.layer.layerId}`);
+        //     }
+        //     break;
+        // }
+        //
+        // case "LAYER_DELETED":
+        //     state.layers = state.layers.filter(layer => layer.layerId !== action.layerId);
+        //     break;
 
         case "SEND_PROGRESS":
             state.sending[action.transferId] = {

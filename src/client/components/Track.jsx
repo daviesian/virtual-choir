@@ -3,7 +3,7 @@ import {connect} from "react-redux";
 import Paper from "@material-ui/core/Paper";
 import {makeStyles} from "@material-ui/core/styles";
 import Typography from "@material-ui/core/Typography";
-import {seek, updateLayer} from "../actions/audioActions";
+import {seek} from "../actions/audioActions";
 import {useCallback, useEffect, useRef} from "react";
 
 const useStyles = makeStyles(theme => ({

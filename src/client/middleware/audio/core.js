@@ -8,17 +8,19 @@ import {createAudioWorkletNode} from "./util";
 import s from "./state";
 import {getAudioBufferRMSImageURL} from "../../util";
 
+window.audioState = s;
+
 const SAMPLE_RATE = 44100;
 
-let scheduleUpcomingLayers = () => {
-    for (let layer of s.layers) {
+let scheduleUpcomingItems = () => {
+    for (let [itemId, item] of Object.entries(s.items)) {
         const LOOKAHEAD = 1;
-        if (!layer.sourceNode && layer.enabled && layer.startTime >= s.context.currentTime - s.transportStartTime - 0.001 && layer.startTime < s.context.currentTime - s.transportStartTime + LOOKAHEAD) {
-            log.info("Scheduling layer", layer);
-            layer.sourceNode = s.context.createBufferSource();
-            layer.sourceNode.buffer = layer.buffer;
-            layer.sourceNode.connect(s.recorderNode);
-            layer.sourceNode.start(s.transportStartTime + layer.startTime);
+        if (!item.sourceNode && item.startTime >= s.context.currentTime - s.transportStartTime - 0.001 && item.startTime < s.context.currentTime - s.transportStartTime + LOOKAHEAD) {
+            log.info("Scheduling item", item);
+            item.sourceNode = s.context.createBufferSource();
+            item.sourceNode.buffer = item.audioBuffer;
+            item.sourceNode.connect(s.recorderNode);
+            item.sourceNode.start(s.transportStartTime + item.startTime);
         }
     }
 };
@@ -156,7 +158,7 @@ export const init = async (inputId, outputId, dispatch) => {
 
     let maybeFinishRecording = () => {
         if (s.recordedVideo?.done && s.recordedAudio) {
-            dispatch(recordingFinished(uuid(), s.recordedVideo.chunks, s.recordedAudio.audioData, s.recordedAudio.startTime, getLatency(inputId, outputId)));
+            dispatch(recordingFinished(uuid(), s.recordedVideo.chunks, s.recordedAudio.audioData, s.recordedAudio.startTime));
         }
     };
 
@@ -270,25 +272,18 @@ export const init = async (inputId, outputId, dispatch) => {
             // We are playing.
             let offsetTime = s.context.currentTime - s.transportStartTime;
 
-            if (s.transportStartTime + s.backingTrackAudioBuffer.duration < s.context.currentTime) {
-                // We've reached the end of the backing track. Stop playing.
-                s.transportStartTime = null;
-                s.backingTrackSourceNode.disconnect();
-                s.backingTrackSourceNode = null;
-            } else {
-                // We're still playing. Schedule any layers that are coming up.
-                scheduleUpcomingLayers();
+            // We're still playing. Schedule any layers that are coming up.
+            scheduleUpcomingItems();
 
-                if (offsetTime > 0) {
-                    for (let c of s.transportTimeCallbacks) {
-                        c(offsetTime);
-                    }
-                    dispatch({
-                        type: "SET_TRANSPORT_TIME",
-                        time: offsetTime || 0,
-                        _log: false
-                    });
+            if (offsetTime > 0) {
+                for (let c of s.transportTimeCallbacks) {
+                    c(offsetTime);
                 }
+                dispatch({
+                    type: "SET_TRANSPORT_TIME",
+                    time: offsetTime || 0,
+                    _log: false
+                });
             }
         }
 
@@ -296,41 +291,64 @@ export const init = async (inputId, outputId, dispatch) => {
     });
 };
 
-export const loadBackingTrack = async (url) => {
-    let buffer = await (await fetch(url)).arrayBuffer();
-    s.backingTrackAudioBuffer = await s.context.decodeAudioData(buffer);
+// export const loadBackingTrack = async (url) => {
+//     let buffer = await (await fetch(url)).arrayBuffer();
+//     s.backingTrackAudioBuffer = await s.context.decodeAudioData(buffer);
+//
+//     return {
+//         duration: s.backingTrackAudioBuffer.duration,
+//         rms: await getAudioBufferRMSImageURL(s.backingTrackAudioBuffer, s.backingTrackAudioBuffer.duration * 20),
+//     };
+// };
+
+export const loadItem = async ({itemId, startTime, startOffset, endOffset, audioUrl, videoUrl}) => {
+
+    let arrayBuffer = await (await fetch(audioUrl || videoUrl)).arrayBuffer();
+
+    let audioBuffer = null;
+    if (audioUrl?.endsWith(".aud")) {
+        let audioData = new Float32Array(arrayBuffer);
+        audioBuffer = s.context.createBuffer(1, audioData.length, s.context.sampleRate);
+        audioBuffer.copyToChannel(audioData, 0, 0);
+    } else {
+        audioBuffer = await s.context.decodeAudioData(arrayBuffer);
+    }
+
+    s.items[itemId] = {
+        itemId,
+        startTime,
+        startOffset,
+        endOffset,
+        audioBuffer
+    };
 
     return {
-        duration: s.backingTrackAudioBuffer.duration,
-        rms: await getAudioBufferRMSImageURL(s.backingTrackAudioBuffer, s.backingTrackAudioBuffer.duration * 20),
+        duration: audioBuffer.duration,
+        rms: await getAudioBufferRMSImageURL(audioBuffer, audioBuffer.duration * 20),
     };
 };
 
 export const play = startTime => {
-    s.backingTrackSourceNode = s.context.createBufferSource();
-    s.backingTrackSourceNode.buffer = s.backingTrackAudioBuffer;
-    s.backingTrackSourceNode.connect(s.recorderNode);
+    // s.backingTrackSourceNode = s.context.createBufferSource();
+    // s.backingTrackSourceNode.buffer = s.backingTrackAudioBuffer;
+    // s.backingTrackSourceNode.connect(s.recorderNode);
 
     let preloadTime = 0.05;
     s.transportStartTime = s.context.currentTime + preloadTime - startTime;
     s.recorderNode.call("setStartTimeOffset", s.transportStartTime);
-    s.backingTrackSourceNode.start(s.transportStartTime + startTime, startTime);
-    scheduleUpcomingLayers();
+    //s.backingTrackSourceNode.start(s.transportStartTime + startTime, startTime);
+    scheduleUpcomingItems();
 
     return true; // N.B. If there's some reason we couldn't start playback, could return false instead.
 };
 
 export const stop = () => {
     stopRecord();
-    for (let layer of s.layers) {
-        if (layer.sourceNode) {
-            layer.sourceNode.disconnect();
-            layer.sourceNode = null;
+    for (let [itemId, item] of Object.entries(s.items)) {
+        if (item.sourceNode) {
+            item.sourceNode.disconnect();
+            item.sourceNode = null;
         }
-    }
-    if (s.backingTrackSourceNode) {
-        s.backingTrackSourceNode.stop();
-        s.backingTrackSourceNode.disconnect();
     }
     s.transportStartTime = null;
 

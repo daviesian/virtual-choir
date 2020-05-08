@@ -18,6 +18,7 @@ export const connect = async (dispatch) => {
                 type: "ws/call",
                 fn: "rtcSignal",
                 kwargs: { data },
+                _log: false,
             });
         });
 

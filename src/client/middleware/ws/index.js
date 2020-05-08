@@ -2,15 +2,14 @@ import RSVP from "rsvp";
 import log from 'loglevel';
 const queryString = require('query-string');
 import {
-    deleteLayer,
-    loadSingerLayer,
+    loadItem,
     play, seek,
     startRecording,
     stop,
-    stopRecording, updateLayer,
+    stopRecording,
 } from "../../actions/audioActions";
 import {
-    loadBackingTrack,
+    projectLoaded,
     sendProgress,
     setRehearsalState,
     setUser,
@@ -54,6 +53,9 @@ export default store => next => {
         loadBackingTrack: ({track}) => {
             store.dispatch(loadBackingTrack(track));
         },
+        loadProject: (project) => {
+            store.dispatch(projectLoaded(project));
+        },
         play: ({startTime}) => {
             store.dispatch(play(startTime));
         },
@@ -72,14 +74,17 @@ export default store => next => {
         updateSingerState: ({user, state}) => {
             store.dispatch(updateSingerState(user, state));
         },
-        newSingerLayer: ({layer}) => {
-            store.dispatch(loadSingerLayer(layer));
-        },
-        updateLayer: ({layer}) => {
-            store.dispatch(updateLayer(layer));
-        },
-        deleteLayer: ({layerId}) => {
-            store.dispatch(deleteLayer(layerId));
+        // newSingerLayer: ({layer}) => {
+        //     store.dispatch(loadSingerLayer(layer));
+        // },
+        // updateLayer: ({layer}) => {
+        //     store.dispatch(updateLayer(layer));
+        // },
+        // deleteLayer: ({layerId}) => {
+        //     store.dispatch(deleteLayer(layerId));
+        // },
+        newItem: ({item, lane, user}) => {
+            store.dispatch(loadItem(item, lane, user))
         },
         singerJoined: ({user}) => {
             store.dispatch(singerJoined(user));
@@ -94,6 +99,7 @@ export default store => next => {
             store.dispatch({
                 type: "rtc/signal",
                 data,
+                _log: false,
             });
         },
         newSingerClip: ({clip}) => {
@@ -108,9 +114,11 @@ export default store => next => {
     };
 
     let receiveIncomingMessage = ({data}) => {
-        log.debug(`[Server] ${data}`);
 
         data = JSON.parse(data);
+        if (data?.cmd !== "rtcSignal") {
+            log.debug(`[Server]`, data);
+        }
 
         if ('callId' in data) {
             let {callId, response, error} = data;

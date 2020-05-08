@@ -1,5 +1,16 @@
 import {stopCalibration} from "../../actions/audioActions";
-import {addLayer, close, getDevices, init, loadBackingTrack, play, record, seek, stop, stopRecord,} from "./core";
+import {
+    addLayer,
+    close,
+    getDevices,
+    init,
+    loadItem,
+    play,
+    record,
+    seek,
+    stop,
+    stopRecord,
+} from "./core";
 import s from "./state";
 
 export default store => next => {
@@ -74,22 +85,22 @@ export default store => next => {
                     s.calibratorNode.parameters.get("enabled").value = 0;
                     break;
 
-                case "loadBackingTrack":
-                    await _init();
-                    return await loadBackingTrack(action.url);
+                // case "loadBackingTrack":
+                //     await _init();
+                //     return await loadBackingTrack(action.url);
 
 
                 case "play":
-                    if (!s.backingTrackAudioBuffer || s.transportStartTime !== null) {
+                    if (s.transportStartTime !== null) {
                         return false; // Should also return false here if there are any other reasons we can't start playback
                     }
                     await _init();
 
-                    for (let layer of s.layers) {
-                        if (layer.sourceNode) {
-                            layer.sourceNode.disconnect();
+                    for (let [itemId, item] of Object.entries(s.items)) {
+                        if (item.sourceNode) {
+                            item.sourceNode.disconnect();
                         }
-                        layer.sourceNode = null;
+                        item.sourceNode = null;
                     }
                     return play(action.startTime || 0);
 
@@ -115,23 +126,26 @@ export default store => next => {
                     }
                     return stopRecord();
 
-                case "addLayer":
-                    await _init();
-                    return await addLayer(action.layerId, action.startTime, action.enabled);
+                case "loadItem":
+                    return await loadItem(action.item);
 
-                case "enableLayer": {
-                    let layer = s.layers.find(({layerId}) => layerId === action.layerId);
-                    if (layer) {
-                        layer.enabled = action.enabled;
-                        return true;
-                    } else {
-                        return false;
-                    }
-                }
-
-                case "deleteLayer":
-                    s.layers = s.layers.filter(layer => layer.layerId !== action.layerId);
-                    return true;
+                // case "addLayer":
+                //     await _init();
+                //     return await addLayer(action.layerId, action.startTime, action.enabled);
+                //
+                // case "enableLayer": {
+                //     let layer = s.layers.find(({layerId}) => layerId === action.layerId);
+                //     if (layer) {
+                //         layer.enabled = action.enabled;
+                //         return true;
+                //     } else {
+                //         return false;
+                //     }
+                // }
+                //
+                // case "deleteLayer":
+                //     s.layers = s.layers.filter(layer => layer.layerId !== action.layerId);
+                //     return true;
 
                 case "addTransportTimeCallback":
                     if (s.transportTimeCallbacks.indexOf(action.callback) === -1) {

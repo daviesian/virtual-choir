@@ -1,14 +1,11 @@
 import {RTCTransceivers} from "../shared";
+import {v4 as uuid} from "uuid";
 import * as db from "./data";
 import {
-    deleteLayer,
     ensureRoomExists,
-    getBackingTrack,
+    getProject, listProjects,
     openDB,
-    saveLayer,
-    setRehearsalState,
-    setRoomBackingTrack,
-    updateLayer
+    saveRoom, listLanes, listItems, addItem, addLane, getLane
 } from "./data";
 
 let video = require("../../build/Release/video.node");
@@ -37,10 +34,10 @@ const { RTCAudioSink, RTCVideoSink, RTCVideoSource, RTCAudioSource, i420ToRgba, 
 let ffmpeg = require("fluent-ffmpeg");
 
 
-let align = (layerId) => {
-    let micBuffer = fs.readFileSync(`.layers/${layerId}.aud`)
+let align = (itemId) => {
+    let micBuffer = fs.readFileSync(`.items/${itemId}.aud`)
     let recordedAudio = new Float32Array(micBuffer.buffer, 0, micBuffer.byteLength / 4);
-    let referenceBuffer = fs.readFileSync(`.layers/${layerId}.reference.aud`);
+    let referenceBuffer = fs.readFileSync(`.items/${itemId}.reference.aud`);
     let referenceAudio = new Float32Array(referenceBuffer.buffer, 0, referenceBuffer.byteLength / 4);
 
     return video.align(recordedAudio.buffer, referenceAudio.buffer);
@@ -120,7 +117,7 @@ let getOrCreateRoom = async (roomId) => {
         rooms[roomId] = {
             roomId,
             name: dbRoom.name,
-            currentBackingTrackId: dbRoom.currentBackingTrackId,
+            currentProjectId: dbRoom.currentProjectId,
             rehearsalState: dbRoom.rehearsalState,
 
             clients: [],
@@ -155,7 +152,7 @@ let messageHandlers = {
     updateUser: async (client, {user}) => {
         if (client.user.userId === user.userId) {
             client.user = user;
-            await db.updateUser(user);
+            await db.saveUser(user);
             client.room.conductor?.sendJSON({cmd: 'userUpdated', user});
         }
     },
@@ -173,7 +170,7 @@ let messageHandlers = {
             return {
                 roomId: roomId,
                 name: client.room.name,
-                currentBackingTrackId: client.room.currentBackingTrackId,
+                currentProjectId: client.room.currentProjectId,
                 rehearsalState: client.room.rehearsalState,
             };
         }
@@ -231,15 +228,19 @@ let messageHandlers = {
         }
         return true;
     },
-    getBackingTrack: async (client, {backingTrackId}) => {
-        return await getBackingTrack(backingTrackId);
+    listProjects: async (client) => {
+        return await listProjects(client.room.roomId);
     },
-    loadBackingTrack: async (client, {backingTrackId}) => {
-        requireConductor(client);
-        roomLog(client.room, `Loading backing track '${backingTrackId}'`);
-        let track = await setRoomBackingTrack(client.room.roomId, backingTrackId);
-
-        conduct(client.room, {cmd: "loadBackingTrack", track});
+    loadProject: async (client, {projectId, conduct}) => {
+        let project = await getProject(projectId);
+        let lanes = await listLanes(projectId);
+        let items = await listItems(projectId);
+        if (client.conducting && conduct) {
+            roomLog(client.room, `Loading project ${projectId}`);
+            await saveRoom({...client.room, currentProjectId: projectId});
+            conduct(client.room, {cmd: "loadProject", project, lanes, items});
+        }
+        return {project, lanes, items};
     },
     play: (client, {startTime}) => {
         requireConductor(client);
@@ -270,23 +271,23 @@ let messageHandlers = {
         client.singerState = state;
         client.room.conductor?.sendJSON({cmd: "updateSingerState", user: client.user, state});
     },
-    newLayer: async (client, { layerId, videoBytes, backingTrackId, referenceOutputStartTime, latencyHint }, data) => {
-        requireUuid(layerId);
-        clientLog(client, "New layer:", data.length, "bytes, of which", videoBytes, "bytes are video");
-        fs.mkdirSync(".layers", {recursive: true});
-        fs.writeFileSync(`.layers/${layerId}.original.vid`, data.subarray(0,videoBytes));
-        fs.writeFileSync(`.layers/${layerId}.reference.aud`, data.subarray(videoBytes));
+    newItem: async (client, { itemId, laneId, videoBytes, backingTrackId, referenceOutputStartTime }, data) => {
+        requireUuid(itemId);
+        clientLog(client, "New item:", data.length-videoBytes, "bytes of audio, ", videoBytes, "bytes of video");
+        fs.mkdirSync(".items", {recursive: true});
+        fs.writeFileSync(`.items/${itemId}.original.vid`, data.subarray(0,videoBytes));
+        fs.writeFileSync(`.items/${itemId}.reference.aud`, data.subarray(videoBytes));
 
-        await new Promise((resolve, reject) => ffmpeg(`.layers/${layerId}.original.vid`)
+        await new Promise((resolve, reject) => ffmpeg(`.items/${itemId}.original.vid`)
             // Extract the recorded audio from the video
-            .output(`.layers/${layerId}.aud`)
+            .output(`.items/${itemId}.aud`)
             .noVideo()
             .format("f32le")
             .audioCodec("pcm_f32le")
             .audioFrequency(44100)
             .audioChannels(1)
             // Strip the audio from the video
-            .output(`.layers/${layerId}.vid`)
+            .output(`.items/${itemId}.vid`)
             .noAudio()
             .videoCodec("copy")
             .format("matroska")
@@ -294,35 +295,42 @@ let messageHandlers = {
             .on('end', resolve)
             .run());
 
-        let offset = align(layerId);
+        let offset = align(itemId);
         console.log("Got offset:", offset.toFixed(3), "s");
-        let layer = await saveLayer(layerId, client.user.userId, backingTrackId, client.room.roomId, referenceOutputStartTime+offset);
+        let lane = await getLane(laneId);
+        if (!lane) {
+            // No valid lane was provided. Create a new lane for this user.
+            laneId = uuid();
+            lane = await addLane(laneId, client.room.currentProjectId, client.user.userId, '', true);
+        }
+        let item = await addItem(itemId, laneId, referenceOutputStartTime+offset, 0, 0, 0, `/.items/${itemId}.aud`, `/.items/${itemId}.vid`);
 
-        client.room.conductor?.sendJSON({cmd: "newSingerLayer", layer});
+        client.room.conductor?.sendJSON({cmd: "newItem", item, lane, user: client.user});
     },
-    getLayers: async (client, {roomId, backingTrackId}) => {
-        return await db.getLayers(roomId, backingTrackId);
-    },
-    updateLayer: async (client, {layer}) => {
-        requireConductor(client);
-        // TODO: Update more than just 'enabled'
-        let updatedLayer = await updateLayer(layer);
-        conduct(client.room, {cmd: "updateLayer", layer: updatedLayer});
-    },
-    deleteLayer: async (client, {layerId}) => {
-        requireUuid(layerId);
-        requireConductor(client);
-        conduct(client.room, {cmd: "deleteLayer", layerId});
-        await deleteLayer(layerId);
-        try { fs.unlinkSync(`.layers/${layerId}.original.vid`); } catch (e) { }
-        try { fs.unlinkSync(`.layers/${layerId}.reference.aud`); } catch (e) { }
-        try { fs.unlinkSync(`.layers/${layerId}.vid`); } catch (e) { }
-        try { fs.unlinkSync(`.layers/${layerId}.aud`); } catch (e) { }
-    },
+    // getLayers: async (client, {roomId, backingTrackId}) => {
+    //     return await db.getLayers(roomId, backingTrackId);
+    // },
+    // updateLayer: async (client, {layer}) => {
+    //     requireConductor(client);
+    //     // TODO: Update more than just 'enabled'
+    //     let updatedLayer = await updateLayer(layer);
+    //     conduct(client.room, {cmd: "updateLayer", layer: updatedLayer});
+    // },
+    // deleteLayer: async (client, {layerId}) => {
+    //     requireUuid(layerId);
+    //     requireConductor(client);
+    //     conduct(client.room, {cmd: "deleteLayer", layerId});
+    //     await deleteLayer(layerId);
+    //     try { fs.unlinkSync(`.layers/${layerId}.original.vid`); } catch (e) { }
+    //     try { fs.unlinkSync(`.layers/${layerId}.reference.aud`); } catch (e) { }
+    //     try { fs.unlinkSync(`.layers/${layerId}.vid`); } catch (e) { }
+    //     try { fs.unlinkSync(`.layers/${layerId}.aud`); } catch (e) { }
+    // },
     setRehearsalState: async (client, {roomId, rehearsalState}) => {
         requireConductor(client);
+        client.room.rehearsalState = rehearsalState;
         conduct(client.room, {cmd: "setRehearsalState", rehearsalState});
-        await setRehearsalState(roomId, rehearsalState);
+        await saveRoom(client.room);
     },
     rtcRequestOffer: async (client) => {
         client.peer = new Peer({ initiator: true, wrtc });
@@ -437,13 +445,14 @@ let onClientMessage = async (client, msg) => {
 
         let data = await receiveBinaryDataForClient(client, binaryDataToFollow);
 
-        let resp = { callId };
+        let resp = { callId, fn };
         try {
             let f = messageHandlers[fn];
             if (!f)
                 throw new Error(`Server function not found: ${fn}`);
             resp.response = await f(client, kwargs, data);
         } catch (e) {
+            console.error(e);
             resp.error = e.message;
         }
         client.sendJSON(resp);
@@ -484,6 +493,7 @@ app.ws("/ws", (ws, {query: {userId}}) => {
 app.use(express.static("static"));
 app.use(express.static("dist"));
 app.use("/.layers", express.static(".layers"));
+app.use("/.items", express.static(".items"));
 
 app.get(/.*/, (req, res) => res.sendFile(path.resolve(root, "../static/index.html")));
 

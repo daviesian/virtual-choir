@@ -19,7 +19,7 @@ import ButtonGroup from "@material-ui/core/ButtonGroup";
 import Typography from "@material-ui/core/Typography";
 import List from "@material-ui/core/List";
 import Transport from "./Layers";
-import {doWebRTC, loadBackingTrack, setConducting} from "../actions";
+import {doWebRTC, setConducting} from "../actions";
 import LinearProgress from "@material-ui/core/LinearProgress";
 import CalibrationDialog from "./dialogs/Calibration";
 import DeviceSelectionDialog from "./dialogs/DeviceSelection";

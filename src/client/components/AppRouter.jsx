@@ -3,6 +3,7 @@ import {useRouteMatch} from "react-router";
 import React, {useEffect} from "react";
 import {requestJoinRoom, requestLeaveRoom, setConducting} from "../actions";
 import {rtcConnect} from "../actions/rtcActions";
+import {init} from "../actions/audioActions";
 
 let AppRouter = ({dispatch}) => {
 
@@ -18,7 +19,7 @@ let AppRouter = ({dispatch}) => {
             if (conductMatch) {
                 await dispatch(setConducting(true));
             }
-
+            await dispatch(init());
             await dispatch(rtcConnect());
 
         } else {

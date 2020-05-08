@@ -16,6 +16,11 @@ Napi::Number align(const Napi::CallbackInfo& info) {
     auto recordedAudio = info[0].As<Napi::ArrayBuffer>();
     auto referenceAudio = info[1].As<Napi::ArrayBuffer>();
 
+    if (recordedAudio.ByteLength() < 88200*4 || referenceAudio.ByteLength() < 132300*4) {
+      log(env, {"Not enough audio to align. Skipping."});
+      return Napi::Number::New(env, 0);
+    }
+
     float* recordedData = (float*)recordedAudio.Data();
     float* referenceData = (float*)referenceAudio.Data();
 

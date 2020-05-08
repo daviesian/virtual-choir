@@ -17,22 +17,17 @@ export const requestJoinRoom = (roomId) => async (dispatch) => {
     });
 
     log.info(`Joined room '${roomId}':`, dbRoom);
-    if (dbRoom?.currentBackingTrackId) {
-        let backingTrack = await dispatch({
-            type: "ws/call",
-            fn: "getBackingTrack",
-            kwargs: { backingTrackId: dbRoom.currentBackingTrackId },
-        });
-        await dispatch(loadBackingTrack(backingTrack, false));
+    if (dbRoom?.currentProjectId) {
+        await dispatch(loadProject(dbRoom.currentProjectId, false));
 
-        let layers = await dispatch({
-            type: "ws/call",
-            fn: "getLayers",
-            kwargs: { roomId, backingTrackId: dbRoom.currentBackingTrackId },
-        });
-        for (let layer of layers) {
-            await dispatch(loadSingerLayer(layer))
-        }
+        // let layers = await dispatch({
+        //     type: "ws/call",
+        //     fn: "getLayers",
+        //     kwargs: { roomId, backingTrackId: dbRoom.currentBackingTrackId },
+        // });
+        // for (let layer of layers) {
+        //     await dispatch(loadSingerLayer(layer))
+        // }
     }
 };
 
@@ -66,10 +61,9 @@ export const singerState = state => ({
         state: {
             user: state.user,
             sending: state.sending,
-            playing: state.transport?.playing,
-            recording: state.transport?.recording,
-            backingTrackId: state.backingTrack?.backingTrackId,
-            loadedLayers: state.layers.map(layer => layer.layerId),
+            state: state.transport?.state,
+            projectId: state.project?.projectId,
+            loadedItems: Object.keys(state.items),
         }
     },
 });
@@ -114,40 +108,33 @@ export const sendProgress = (transferId, sentBytes, totalBytes, coarseUpdate=fal
 
 };
 
-
-export const loadBackingTrack = ({backingTrackId, name, url}, conduct = false) => async dispatch => {
-
-    if (conduct) {
-        dispatch({
-            type: "ws/call",
-            fn: "loadBackingTrack",
-            kwargs: {backingTrackId},
-        });
-    }
-
-    let {duration, rms} = await dispatch({
-        type: "audio/loadBackingTrack",
-        url,
+export const loadProject = (projectId, conduct = false) => async dispatch => {
+    let project = await dispatch({
+        type: "ws/call",
+        fn: "loadProject",
+        kwargs: {projectId, conduct},
     });
 
-    let lyricsSrt = await (await fetch(url.replace(/\.[^.]*$/, ".srt"))).text();
-    let lyrics = [];
-    try {
-        lyrics = parseSRT(lyricsSrt);
-    } catch (e) {
-        console.warn(`Couldn't load lyrics for backing track '${name}'`)
+    dispatch(projectLoaded(project));
+}
+
+export const projectLoaded = ({project, lanes, items}) => async dispatch => {
+
+    for (let item of items) {
+        let audioItem = await dispatch({
+            type: "audio/loadItem",
+            item,
+        });
+        item.duration = audioItem.duration;
+        item.rms = audioItem.rms;
     }
 
     dispatch({
-        type: "BACKING_TRACK_LOADED",
-        backingTrackId,
-        name,
-        url,
-        duration,
-        rms,
-        lyrics,
-    })
-
+        type: "PROJECT_LOADED",
+        project,
+        lanes,
+        items,
+    });
 };
 
 export const setUser = (user) => ({

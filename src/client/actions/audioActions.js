@@ -52,57 +52,78 @@ export const stopCalibration = () => async dispatch => {
     });
 };
 
-export const loadSingerLayer = (layer) => async (dispatch, getState) => {
+export const loadItem = (item, lane, user) => async (dispatch, getState) => {
+    // TODO: Make sure the user exists
 
-    let addedLayer = await dispatch({
-        type: "audio/addLayer",
-        ...layer,
-    });
-
-    dispatch({
-        type: "LAYER_ADDED",
-        startTime: layer.startTime,
-        duration: addedLayer.duration,
-        layerId: layer.layerId,
-        rms: addedLayer.rms,
-        name: layer.name,
-        enabled: layer.enabled,
-    });
-
-    window.videos[layer.layerId] = `/.layers/${layer.layerId}.vid`;//await (await fetch()).blob();
-
-};
-
-export const updateLayer = (layer, them=false) => async (dispatch, getState) => {
-
-    if (them) {
-        dispatch({
-            type: "ws/call",
-            fn: "updateLayer",
-            kwargs: { layer },
+    if (!lane.laneId in getState().lanes) {
+        await dispatch({
+            type: "LANE_ADDED",
+            lane,
         });
     }
 
-    let state = getState();
-    if (layer.enabled && !state.layers.find((l) => l.layerId === layer.layerId)) {
-        await dispatch(loadSingerLayer(layer));
-    }
-
-    dispatch({
-        type: "audio/enableLayer",
-        layerId: layer.layerId,
-        enabled: layer.enabled,
+    let audioItem = await dispatch({
+        type: "audio/loadItem",
+        item,
     });
 
-    dispatch({
-        type: "LAYER_UPDATE",
-        layer,
-    });
-
-    if (!getState().conducting) {
-        dispatch(singerState(getState()));
-    }
+    await dispatch({
+        type: "ITEM_ADDED",
+        item: { ...item, ...audioItem },
+    })
 };
+
+// export const loadSingerLayer = (layer) => async (dispatch, getState) => {
+//
+//     let addedLayer = await dispatch({
+//         type: "audio/addLayer",
+//         ...layer,
+//     });
+//
+//     dispatch({
+//         type: "LAYER_ADDED",
+//         startTime: layer.startTime,
+//         duration: addedLayer.duration,
+//         layerId: layer.layerId,
+//         rms: addedLayer.rms,
+//         name: layer.name,
+//         enabled: layer.enabled,
+//     });
+//
+//     window.videos[layer.layerId] = `/.layers/${layer.layerId}.vid`;//await (await fetch()).blob();
+//
+// };
+//
+// export const updateLayer = (layer, them=false) => async (dispatch, getState) => {
+//
+//     if (them) {
+//         dispatch({
+//             type: "ws/call",
+//             fn: "updateLayer",
+//             kwargs: { layer },
+//         });
+//     }
+//
+//     let state = getState();
+//     if (layer.enabled && !state.layers.find((l) => l.layerId === layer.layerId)) {
+//         await dispatch(loadSingerLayer(layer));
+//     }
+//
+//     dispatch({
+//         type: "audio/enableLayer",
+//         layerId: layer.layerId,
+//         enabled: layer.enabled,
+//     });
+//
+//     dispatch({
+//         type: "LAYER_UPDATE",
+//         layer,
+//     });
+//
+//     if (!getState().conducting) {
+//         dispatch(singerState(getState()));
+//     }
+// };
 
 export const play = (startTime, me=true, them=false) => async (dispatch, getState) => {
 
@@ -142,7 +163,7 @@ export const stop = (me=true, them=false) => async (dispatch, getState) => {
     if (me && await dispatch({type: "audio/stop"})) {
 
         dispatch({
-            type: "PLAYBACK_STOPPED",
+            type: "STOPPED",
         });
         if (!getState().conducting) {
             dispatch(singerState(getState()));
@@ -239,7 +260,7 @@ export const stopRecording = (me=true, them=false) => async (dispatch, getState)
 //     });
 // };
 
-export const recordingFinished = (layerId, videoFileBlobs, referenceOutputData, referenceOutputStartTime, latencyHint) => async (dispatch, getState) => {
+export const recordingFinished = (itemId, videoFileBlobs, referenceOutputData, referenceOutputStartTime) => async (dispatch, getState) => {
     let data = new Uint8Array(videoFileBlobs.reduce((totalSize, blob) => totalSize + blob.size, 0) + referenceOutputData.byteLength);
 
     let ptr = 0;
@@ -254,38 +275,37 @@ export const recordingFinished = (layerId, videoFileBlobs, referenceOutputData, 
 
     await dispatch({
         type: "ws/call",
-        fn: "newLayer",
+        fn: "newItem",
         kwargs: {
-            layerId,
+            itemId,
+            laneId: getState().targetLaneId,
             videoBytes: ptr,
-            backingTrackId: getState().backingTrack.backingTrackId,
             referenceOutputStartTime,
-            latencyHint,
         },
         data
     });
 };
 
-export const deleteLayer = (layerId, them) => async (dispatch, getState) => {
-
-    if (them) {
-        dispatch({
-            type: "ws/call",
-            fn: "deleteLayer",
-            kwargs: { layerId },
-        });
-    }
-
-    await dispatch({
-        type: "audio/deleteLayer",
-        layerId,
-    });
-
-    dispatch({
-        type: "LAYER_DELETED",
-        layerId,
-    });
-};
+// export const deleteLayer = (layerId, them) => async (dispatch, getState) => {
+//
+//     if (them) {
+//         dispatch({
+//             type: "ws/call",
+//             fn: "deleteLayer",
+//             kwargs: { layerId },
+//         });
+//     }
+//
+//     await dispatch({
+//         type: "audio/deleteLayer",
+//         layerId,
+//     });
+//
+//     dispatch({
+//         type: "LAYER_DELETED",
+//         layerId,
+//     });
+// };
 
 
 export const seek = (time, me=true, them=false) => async (dispatch, getState) => {

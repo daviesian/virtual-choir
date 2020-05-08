@@ -15,9 +15,10 @@ export const openDB = async () => {
     });
 
     await db.exec("CREATE TABLE IF NOT EXISTS users (userId, name, voice)");
-    await db.exec("CREATE TABLE IF NOT EXISTS backingTracks (backingTrackId, name, url)");
-    await db.exec("CREATE TABLE IF NOT EXISTS rooms (roomId, name, currentBackingTrackId, rehearsalState)");
-    await db.exec("CREATE TABLE IF NOT EXISTS layers (layerId, userId, backingTrackId, roomId, startTime, duration, enabled)");
+    await db.exec("CREATE TABLE IF NOT EXISTS rooms (roomId, name, currentProjectId, rehearsalState)");
+    await db.exec("CREATE TABLE IF NOT EXISTS projects (projectId, roomId, name)");
+    await db.exec("CREATE TABLE IF NOT EXISTS lanes (laneId, projectId, userId, name, enabled)")
+    await db.exec("CREATE TABLE IF NOT EXISTS items (itemId, laneId, startTime, startOffset, endOffset, idx, audioUrl, videoUrl)");
 }
 
 export const getUser = async (userId) => {
@@ -30,7 +31,7 @@ export const createUser = async () => {
     return newId;
 }
 
-export const updateUser = async ({userId, name, voice}) => {
+export const saveUser = async ({userId, name, voice}) => {
     await db.run(SQL`UPDATE users SET name=${name}, voice=${voice} WHERE userId=${userId}`);
 }
 
@@ -44,54 +45,72 @@ export const ensureRoomExists = async (roomId) => {
     return room;
 };
 
-export const addBackingTrack = async (backingTrackId, name, url) => {
-    await db.run(SQL`INSERT INTO backingTracks (backingTrackId, name, url)
-                     VALUES (${backingTrackId}, ${name}, ${url})`);
+export const saveRoom = async({roomId, name, currentProjectId, rehearsalState}) => {
+    await db.run(SQL`UPDATE rooms SET name=${name}, currentProjectId=${currentProjectId}, rehearsalState=${JSON.stringify(rehearsalState)} WHERE roomId=${roomId}`);
+}
+
+
+export const addProject = async (projectId, roomId, name) => {
+    await db.run(SQL`INSERT INTO projects (projectId, roomId, name)
+                     VALUES (${projectId}, ${roomId}, ${name})`);
+}
+
+export const listProjects = async (roomId) => {
+    return await db.all(SQL`SELECT * FROM projects WHERE roomId=${roomId}`);
+}
+
+export const getProject = async (projectId) => {
+    return await db.get(SQL`SELECT * FROM projects WHERE projectId=${projectId}`);
+}
+
+export const saveProject = async ({projectId, name}) => {
+    await db.run(SQL`UPDATE projects SET name=${name} WHERE projectId = ${projectId}`);
+}
+
+export const deleteProject = async (projectId) => {
+    await db.run(SQL`DELETE FROM projects WHERE projectId=${projectId}`);
+}
+
+export const addLane = async (laneId, projectId, userId, name, enabled) => {
+    await db.run(SQL`INSERT INTO lanes (laneId, projectId, userId, name, enabled)
+                     VALUES (${laneId}, ${projectId}, ${userId}, ${name}, ${enabled})`);
+    return await getLane(laneId);
+}
+
+export const listLanes = async (projectId) => {
+    return await db.all(SQL`SELECT * FROM lanes WHERE projectId=${projectId}`);
+}
+
+export const getLane = async (laneId) => {
+    return await db.get(SQL`SELECT * FROM lanes WHERE laneId=${laneId}`);
+}
+
+export const saveLane = async ({laneId, name, enabled}) => {
+    await db.run(SQL`UPDATE lanes SET name=${name}, enabled=${enabled} WHERE laneId=${laneId}`);
+}
+
+export const deleteLane = async (laneId) => {
+    await db.run(SQL`DELETE FROM lanes WHERE laneId=${laneId}`);
+}
+
+export const addItem = async (itemId, laneId, startTime, startOffset, endOffset, idx, audioUrl, videoUrl) => {
+    await db.run(SQL`INSERT INTO items (itemId, laneId, startTime, startOffset, endOffset, idx, audioUrl, videoUrl)
+                     VALUES (${itemId}, ${laneId}, ${startTime}, ${startOffset}, ${endOffset}, ${idx}, ${audioUrl}, ${videoUrl})`);
+    return await getItem(itemId);
+}
+
+export const getItem = async (itemId) => {
+    return await db.get(SQL`SELECT * FROM items WHERE itemId=${itemId}`);
 };
 
-export const listBackingTracks = async () => {
-    return await db.all(`SELECT * FROM backingTracks`);
+export const listItems = async (projectId) => { // N.B. Not laneId.
+    return await db.all(SQL`SELECT items.* FROM items NATURAL JOIN lanes WHERE projectId=${projectId}`);
 }
 
-export const getBackingTrack = async (backingTrackId) => {
-    return await db.get(SQL`SELECT * FROM backingTracks WHERE backingTrackId=${backingTrackId}`);
+export const saveItem = async ({itemId, laneId, startOffset, endOffset, videoUrl}) => {
+    await db.run(SQL`UPDATE items SET laneId=${laneId}, startOffset=${startOffset}, endOffset=${endOffset}, videoUrl=${videoUrl} WHERE itemId=${itemId}`);
 }
 
-export const setRoomName = async (roomId, name) => {
-    await ensureRoomExists(roomId);
-    await db.run(SQL`UPDATE rooms SET name=${name} WHERE roomId=${roomId}`);
+export const deleteItem = async (itemId) => {
+    await db.run(SQL`DELETE FROM items WHERE itemId=${itemId}`);
 }
-
-export const setRoomBackingTrack = async (roomId, backingTrackId) => {
-    await ensureRoomExists(roomId);
-    await db.run(SQL`UPDATE rooms SET currentBackingTrackId=${backingTrackId} WHERE roomId=${roomId}`);
-    return await getBackingTrack(backingTrackId);
-}
-
-export const saveLayer = async (layerId, userId, backingTrackId, roomId, startTime) => {
-    await ensureRoomExists(roomId);
-    await db.run(SQL`INSERT INTO layers (layerId, userId, backingTrackId, roomId, startTime)
-                     VALUES (${layerId}, ${userId}, ${backingTrackId}, ${roomId}, ${startTime})`);
-    return await getLayer(layerId);
-};
-
-export const updateLayer = async ({layerId, enabled}) => {
-    await db.run(SQL`UPDATE layers SET enabled=${enabled} WHERE layerId=${layerId}`);
-    return await getLayer(layerId);
-}
-
-export const deleteLayer = async (layerId) => {
-    await db.run(SQL`DELETE FROM layers WHERE layerId=${layerId}`);
-};
-
-export const getLayer = async (layerId) => {
-    return await db.get(SQL`SELECT * FROM layers NATURAL JOIN users WHERE layerId=${layerId}`);
-}
-
-export const getLayers = async (roomId, backingTrackId) => {
-    return await db.all(SQL`SELECT * FROM layers NATURAL JOIN users WHERE roomId=${roomId} AND backingTrackId=${backingTrackId}`);
-}
-
-export const setRehearsalState = async (roomId, rehearsalState) => {
-    return await db.run(SQL`UPDATE rooms SET rehearsalState=${JSON.stringify(rehearsalState)} WHERE roomId=${roomId}`);
-};

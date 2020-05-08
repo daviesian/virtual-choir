@@ -1,5 +1,5 @@
 import * as React from 'react';
-import {deleteLayer} from "../actions/audioActions";
+import {} from "../actions/audioActions";
 import {connect} from "react-redux";
 
 let Layer = ({layer, conducting, dispatch}) => {
