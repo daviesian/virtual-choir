@@ -23,6 +23,7 @@ import Sidebar from "./Sidebar";
 import ProfileDialog from "./dialogs/Profile";
 import Lyrics from "./Lyrics";
 import Transport from "./Transport";
+import Tracks from "./Tracks";
 
 const useStyles = makeStyles(theme => ({
     rootContainer: {
@@ -36,7 +37,7 @@ const useStyles = makeStyles(theme => ({
         minHeight: 0,
         backgroundColor: '#cecece',
         display: 'grid',
-        gridTemplateColumns: [['minmax(min-content, 300px)','auto']],
+        gridTemplateColumns: [[sidebarWidth,'auto']],
         gridTemplateRows: [['1fr', 'minmax(min-content,200px)']],
     }),
     gridItem: {
@@ -46,7 +47,7 @@ const useStyles = makeStyles(theme => ({
         margin: [[0, 10]],
     },
     myVideo: {
-        width: 300,
+        width: ({sidebarWidth}) => sidebarWidth,
     },
     mainPanelVideoHolder: {
         position: 'relative',
@@ -55,6 +56,29 @@ const useStyles = makeStyles(theme => ({
         height: "100%",
         display: "block",
         margin: [[0, 'auto']],
+    },
+    topLeft: {
+        gridColumn: '1 / 2',
+        gridRow: '1 / 2',
+    },
+    topRight: {
+        gridColumn: '2 / 3',
+        gridRow: '1 / 2',
+    },
+    topRow: {
+        gridColumn: '1 / 3',
+        gridRow: '1 / 2',
+    },
+    bottomLeft: {
+        gridColumn: '1 / 2',
+        gridRow: '2 / 3',
+    },
+    bottomRight: {
+        gridColumn: '2 / 3',
+        gridRow: '2 / 3',
+    },
+    tracks: {
+        gridColumn: 'span 2',
     }
 }));
 
@@ -75,12 +99,13 @@ const Video = ({stream, ...props}) => {
 };
 
 const Main = ({rtcStarted, user}) => {
+    const sidebarWidth = 300;
+
     let classes = useStyles({
-        sidebarWidth: 400,
-        myVideoAspectRatio: 3/2,
+        sidebarWidth,
     });
 
-    let [selectedPanel, setSelectedPanel] = useState('choir');
+    let [selectedPanel, setSelectedPanel] = useState('tracks');
     let [profileOpen, setProfileOpen] = useState(false);
 
     useEffect(() => {
@@ -97,19 +122,19 @@ const Main = ({rtcStarted, user}) => {
 
     switch(selectedPanel) {
         case 'conductor':
-            mainPanel = <div className={classes.mainPanelVideoHolder}><Video className={classes.mainPanelVideo} stream={conductorVideoStream}/></div>;
+            mainPanel = <div className={clsx(classes.mainPanelVideoHolder, classes.topRight)}><Video className={classes.mainPanelVideo} stream={conductorVideoStream}/></div>;
             break;
         case 'choir':
-            mainPanel = <div className={classes.mainPanelVideoHolder}><Video className={classes.mainPanelVideo} stream={choirVideoStream}/></div>;
+            mainPanel = <div className={clsx(classes.mainPanelVideoHolder, classes.topRight)}><Video className={classes.mainPanelVideo} stream={choirVideoStream}/></div>;
             break;
         case 'score':
-            mainPanel = <Paper>Score</Paper>;
+            mainPanel = <Paper className={classes.topRight}>Score</Paper>;
             break;
         case 'lyrics':
-            mainPanel = <Lyrics />;
+            mainPanel = <Lyrics className={classes.topRight}/>;
             break;
         case 'tracks':
-            mainPanel = <Paper>Tracks</Paper>;
+            mainPanel = <Tracks sidebarWidth={sidebarWidth} className={classes.topRow}/>;
             break;
     }
 
@@ -136,10 +161,10 @@ const Main = ({rtcStarted, user}) => {
         </AppBar>
         <div className={classes.appBarOffset}/>
             <div className={classes.grid}>
-                <Sidebar/>
+                {selectedPanel !== 'tracks' && <Sidebar className={classes.topLeft}/>}
                 {mainPanel}
-                <Video className={classes.myVideo} stream={myVideoStream}/>
-                <Transport/>
+                <Video className={clsx(classes.bottomLeft, classes.myVideo)} stream={myVideoStream}/>
+                <Transport className={classes.bottomRight}/>
             </div>
         <ProfileDialog open={profileOpen} user={user} onClose={() => setProfileOpen(false)}/>
     </Container>;

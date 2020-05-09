@@ -17,8 +17,13 @@ import {CircularProgress} from "@material-ui/core";
 import Paper from "@material-ui/core/Paper";
 import ListSubheader from "@material-ui/core/ListSubheader";
 import Divider from "@material-ui/core/Divider";
+import Badge from "@material-ui/core/Badge";
 
 const useStyles = makeStyles(theme => ({
+    root: {
+        minHeight: 0,
+        overflowY: 'auto',
+    },
     play: {
         color: 'white',
         backgroundColor: green[500],
@@ -34,14 +39,16 @@ const useStyles = makeStyles(theme => ({
         position: 'absolute',
         marginLeft: -5,
     },
+    online: {
+    }
 }));
 
-let Sidebar = ({singers, user, dispatch}) => {
+let Sidebar = ({className, users, user, dispatch}) => {
 
     let classes = useStyles();
 
-    let singerList = Object.entries(singers).filter(([userId, singer]) => userId !== user?.userId).map(([userId, singer]) => {
-        let s = {...singer};
+    let singerList = Object.entries(users).filter(([userId, u]) => userId !== user?.userId).map(([userId, u]) => {
+        let s = {...u};
         let sends = Object.entries(s.state?.sending || {});
         s.uploadProgress = null;
         if (sends.length > 0) {
@@ -50,27 +57,13 @@ let Sidebar = ({singers, user, dispatch}) => {
         return s;
     });
 
-    return <Paper style={{minHeight:0, overflow:"auto"}}>
+    return <Paper elevation={0} square className={clsx(className, classes.root)}>
         <List>
-            <ListItem>
-                {<ListItemAvatar>
-                    <Avatar className={clsx({
-                        [classes.play]: false,
-                        [classes.record]: false,
-                        [classes.pause]: true,
-                    })}>
-                        <PauseIcon/>
-                    </Avatar>
-                </ListItemAvatar>}
-                <ListItemText primary={"Conductor Name"} secondary={"Conductor"}/>
-                <CircularProgress size={50} className={classes.uploadProgress} variant="static" value={0}/>
-            </ListItem>
-            <Divider/>
 
-            {singerList.map(singer =>
-                <ListItem key={singer.user.userId}>
+            {singerList.map(singer => <div key={singer.user.userId}>
+                <ListItem>
                     {<ListItemAvatar>
-                        <Avatar className={clsx({
+                        <Avatar variant={"rounded"} className={clsx({
                             [classes.play]: singer.state?.playing && !singer.state?.recording,
                             [classes.record]: singer.state?.recording,
                             [classes.pause]: !singer.state?.playing && !singer.state?.recording,
@@ -78,9 +71,13 @@ let Sidebar = ({singers, user, dispatch}) => {
                             {singer.state?.recording ? <FiberManualRecordIcon/> : singer.state?.playing ? <PlayArrowIcon/> : <PauseIcon/>}
                         </Avatar>
                     </ListItemAvatar>}
-                    <ListItemText primary={singer.user.name} secondary={`${singer.user?.voice || 'Singer'}`}/>
+
+                        <ListItemText primary={`${singer.user.name} ${ singer.online || singer.user.userId === user?.userId ? '' : '(Offline)'}`} secondary={`${singer.user?.voice || 'Singer'}`}/>
+
                     <CircularProgress size={50} className={classes.uploadProgress} variant="static" value={singer.uploadProgress}/>
-                </ListItem>)
+                </ListItem>
+                <Divider/>
+                </div>)
             }
 
         </List>
@@ -88,7 +85,7 @@ let Sidebar = ({singers, user, dispatch}) => {
 }
 
 export default connect(state => ({
-    singers: state.singers,
+    users: state.users,
     conductor: state.conductor,
     user: state.user,
 }))(Sidebar);

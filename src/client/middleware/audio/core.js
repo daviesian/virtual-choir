@@ -15,12 +15,16 @@ const SAMPLE_RATE = 44100;
 let scheduleUpcomingItems = () => {
     for (let [itemId, item] of Object.entries(s.items)) {
         const LOOKAHEAD = 1;
-        if (!item.sourceNode && item.startTime >= s.context.currentTime - s.transportStartTime - 0.001 && item.startTime < s.context.currentTime - s.transportStartTime + LOOKAHEAD) {
+        if (!item.sourceNode && item.laneId in s.enabledLanes && (item.startTime+item.audioBuffer.duration) >= s.context.currentTime - s.transportStartTime - 0.001 && item.startTime < s.context.currentTime - s.transportStartTime + LOOKAHEAD) {
             log.info("Scheduling item", item);
+
+            let shouldStartAt = s.transportStartTime + item.startTime;
+            let actualStartAt = Math.max(s.context.currentTime + 0.01, shouldStartAt);
+
             item.sourceNode = s.context.createBufferSource();
             item.sourceNode.buffer = item.audioBuffer;
             item.sourceNode.connect(s.recorderNode);
-            item.sourceNode.start(s.transportStartTime + item.startTime);
+            item.sourceNode.start(actualStartAt, Math.max(0, actualStartAt - shouldStartAt));
         }
     }
 };
@@ -291,17 +295,7 @@ export const init = async (inputId, outputId, dispatch) => {
     });
 };
 
-// export const loadBackingTrack = async (url) => {
-//     let buffer = await (await fetch(url)).arrayBuffer();
-//     s.backingTrackAudioBuffer = await s.context.decodeAudioData(buffer);
-//
-//     return {
-//         duration: s.backingTrackAudioBuffer.duration,
-//         rms: await getAudioBufferRMSImageURL(s.backingTrackAudioBuffer, s.backingTrackAudioBuffer.duration * 20),
-//     };
-// };
-
-export const loadItem = async ({itemId, startTime, startOffset, endOffset, audioUrl, videoUrl}) => {
+export const loadItem = async ({itemId, laneId, startTime, startOffset, endOffset, audioUrl, videoUrl}) => {
 
     let arrayBuffer = await (await fetch(audioUrl || videoUrl)).arrayBuffer();
 
@@ -319,24 +313,20 @@ export const loadItem = async ({itemId, startTime, startOffset, endOffset, audio
         startTime,
         startOffset,
         endOffset,
-        audioBuffer
+        audioBuffer,
+        laneId,
     };
 
     return {
         duration: audioBuffer.duration,
-        rms: await getAudioBufferRMSImageURL(audioBuffer, audioBuffer.duration * 20),
+        rms: await getAudioBufferRMSImageURL(audioBuffer, audioBuffer.duration * 40),
     };
 };
 
 export const play = startTime => {
-    // s.backingTrackSourceNode = s.context.createBufferSource();
-    // s.backingTrackSourceNode.buffer = s.backingTrackAudioBuffer;
-    // s.backingTrackSourceNode.connect(s.recorderNode);
-
     let preloadTime = 0.05;
     s.transportStartTime = s.context.currentTime + preloadTime - startTime;
     s.recorderNode.call("setStartTimeOffset", s.transportStartTime);
-    //s.backingTrackSourceNode.start(s.transportStartTime + startTime, startTime);
     scheduleUpcomingItems();
 
     return true; // N.B. If there's some reason we couldn't start playback, could return false instead.
@@ -383,21 +373,17 @@ export const stopRecord = () => {
     return true;
 };
 
-export const addLayer = async (layerId, startTime, enabled=false) => {
-    let audioData = new Float32Array(await (await fetch(`/.layers/${layerId}.aud`)).arrayBuffer());
+export const enableLane = (laneId) => {
+    s.enabledLanes[laneId] = true;
+};
 
-    let audioBuffer = s.context.createBuffer(1, audioData.length, s.context.sampleRate);
-    audioBuffer.copyToChannel(audioData, 0, 0);
-    s.layers.push({
-        buffer: audioBuffer,
-        startTime: startTime,
-        layerId,
-        enabled: enabled,
-    });
-    return {
-        duration: audioBuffer.duration,
-        layerId,
-        rms: await getAudioBufferRMSImageURL(audioBuffer, audioBuffer.duration * 20),
-    };
-
-}
+export const disableLane = (laneId) => {
+    // TODO: Stop and playing items in disabled lane.
+    for (let item of Object.values(s.items)) {
+        if (item.laneId === laneId && item.sourceNode) {
+            item.sourceNode.disconnect();
+            item.sourceNode = null;
+        }
+    }
+    delete s.enabledLanes[laneId];
+};

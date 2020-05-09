@@ -15,7 +15,6 @@ const loggerMiddleware = createLogger({
 const initialState = {
     audioInitialised: false,
     backingTrack: null,
-    //layers: [],
     transport: {
         currentTime: 0,
         state: null,
@@ -25,12 +24,14 @@ const initialState = {
     calibration: null,
     devices: null,
     user: null,
-    singers: {},
+    users: {},
     rehearsalState: {},
     rtcStarted: false,
     speaking: false,
     speaker: null,
     targetLaneId: null,
+    items: {},
+    lanes: {},
 };
 
 let rootReducer = produce((state, action) => {
@@ -103,18 +104,44 @@ let rootReducer = produce((state, action) => {
             //     lyrics: action.lyrics,
             // };
             state.project = action.project;
-            state.lanes = {};
-            for (let lane of action.lanes || []) {
-                state.lanes[lane.id] = lane;
-            }
-            state.items = {};
-            for (let item of action.items || []) {
-                state.items[item.id] = item;
+            for (let user of action.users || []) {
+                if (!(user.userId in state.users)) {
+                    state.users[user.userId] = {
+                        user,
+                        state: null,
+                        online: false,
+                    }
+                }
             }
             break;
 
         case "LANE_ADDED":
-            state.lanes[action.lane.id] = action.lane;
+            state.lanes[action.lane.laneId] = action.lane;
+            break;
+
+        case "ITEM_ADDED":
+            state.items[action.item.itemId] = action.item;
+            break;
+
+        case "LANE_UPDATED":
+            state.lanes[action.lane.laneId] = action.lane;
+            break;
+
+        case "ITEM_UPDATED":
+            state.items[action.item.itemId] = action.item;
+            break;
+
+        case "LANE_DELETED":
+            for (let [itemId, item] of Object.entries(state.items || {})) {
+                if (item.laneId === action.laneId) {
+                    delete state.items[itemId];
+                }
+            }
+            delete state.lanes[action.laneId];
+            break;
+
+        case "ITEM_DELETED":
+            delete state.items[action.itemId];
             break;
 
         case "SEEK":
@@ -175,20 +202,25 @@ let rootReducer = produce((state, action) => {
             break;
 
         case "UPDATE_SINGER_STATE":
-            state.singers[action.user.userId] = {
+            state.users[action.user.userId] = {
                 user: action.user,
                 state: action.state,
+                online: true,
             };
             break;
 
         case "SINGER_LEFT":
-            delete state.singers[action.userId];
+            if (action.userId in state.users) {
+                state.users[action.userId].online = false;
+            }
             break;
 
         case "SINGER_JOINED":
-            state.singers[action.user.userId] = {
+
+            state.users[action.user.userId] = {
                 user: action.user,
                 state: null,
+                online: true,
             };
             break;
 

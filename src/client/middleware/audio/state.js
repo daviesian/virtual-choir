@@ -14,7 +14,8 @@ export default {
 
     recorderNode: null,
     calibratorNode: null,
-    //layers: [],
-    items: [],
+
+    items: {},
     transportTimeCallbacks: [],
+    enabledLanes: {},
 };

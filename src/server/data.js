@@ -6,7 +6,7 @@ import SQL from 'sql-template-strings';
 import {v4 as uuid} from "uuid";
 
 
-let db = null;
+export let db = null;
 
 export const openDB = async () => {
     db = await open({
@@ -33,6 +33,10 @@ export const createUser = async () => {
 
 export const saveUser = async ({userId, name, voice}) => {
     await db.run(SQL`UPDATE users SET name=${name}, voice=${voice} WHERE userId=${userId}`);
+}
+
+export const listUsers = async (projectId) => {
+    return await db.all(SQL`SELECT DISTINCT users.* FROM users INNER JOIN lanes ON (lanes.userId = users.userId) WHERE projectId=${projectId}`);
 }
 
 export const ensureRoomExists = async (roomId) => {
@@ -71,9 +75,9 @@ export const deleteProject = async (projectId) => {
     await db.run(SQL`DELETE FROM projects WHERE projectId=${projectId}`);
 }
 
-export const addLane = async (laneId, projectId, userId, name, enabled) => {
-    await db.run(SQL`INSERT INTO lanes (laneId, projectId, userId, name, enabled)
-                     VALUES (${laneId}, ${projectId}, ${userId}, ${name}, ${enabled})`);
+export const addLane = async (laneId, projectId, userId, name, idx, enabled) => {
+    await db.run(SQL`INSERT INTO lanes (laneId, projectId, userId, name, idx, enabled)
+                     VALUES (${laneId}, ${projectId}, ${userId}, ${name}, ${idx}, ${enabled})`);
     return await getLane(laneId);
 }
 
@@ -103,8 +107,12 @@ export const getItem = async (itemId) => {
     return await db.get(SQL`SELECT * FROM items WHERE itemId=${itemId}`);
 };
 
-export const listItems = async (projectId) => { // N.B. Not laneId.
-    return await db.all(SQL`SELECT items.* FROM items NATURAL JOIN lanes WHERE projectId=${projectId}`);
+export const listItemsByProject = async (projectId) => {
+    return await db.all(SQL`SELECT items.* FROM items INNER JOIN lanes ON (items.laneId = lanes.laneId) WHERE projectId=${projectId}`);
+}
+
+export const listItemsByLane = async (laneId) => {
+    return await db.all(SQL`SELECT * FROM items WHERE laneId=${laneId}`);
 }
 
 export const saveItem = async ({itemId, laneId, startOffset, endOffset, videoUrl}) => {

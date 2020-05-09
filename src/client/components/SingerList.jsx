@@ -44,7 +44,7 @@ const useStyles = makeStyles(theme => ({
     },
 }));
 
-let SingerList = ({open, singers, user, dispatch}) => {
+let SingerList = ({open, users, user, dispatch}) => {
 
     if (!user) {
         return null;
@@ -52,8 +52,8 @@ let SingerList = ({open, singers, user, dispatch}) => {
 
     let classes = useStyles();
 
-    let singerList = Object.entries(singers).filter(([userId, singer]) => userId !== user.userId).map(([userId, singer]) => {
-        let s = {...singer};
+    let singerList = Object.entries(users).filter(([userId, user]) => userId !== user.userId).map(([userId, user]) => {
+        let s = {...user};
         let sends = Object.entries(s.state?.sending || {});
         s.uploadProgress = null;
         if (sends.length > 0) {
@@ -87,6 +87,6 @@ let SingerList = ({open, singers, user, dispatch}) => {
 }
 
 export default connect(state => ({
-    singers: state.singers,
+    users: state.users,
     user: state.user,
 }))(SingerList);

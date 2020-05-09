@@ -1,7 +1,7 @@
 import {stopCalibration} from "../../actions/audioActions";
 import {
     addLayer,
-    close,
+    close, disableLane, enableLane,
     getDevices,
     init,
     loadItem,
@@ -59,13 +59,13 @@ export default store => next => {
                 case "init": {
                     await _init();
 
-                    let state = store.getState();
-                    if (state.backingTrack) {
-                        await loadBackingTrack(state.backingTrack.url);
-                    }
-                    for (let layer of state.layers || []) {
-                        await addLayer(layer.layerId, layer.startTime, layer.enabled);
-                    }
+                    // let state = store.getState();
+                    // if (state.backingTrack) {
+                    //     await loadBackingTrack(state.backingTrack.url);
+                    // }
+                    // for (let layer of state.layers || []) {
+                    //     await addLayer(layer.layerId, layer.startTime, layer.enabled);
+                    // }
                     break;
                 }
 
@@ -129,23 +129,17 @@ export default store => next => {
                 case "loadItem":
                     return await loadItem(action.item);
 
-                // case "addLayer":
-                //     await _init();
-                //     return await addLayer(action.layerId, action.startTime, action.enabled);
-                //
-                // case "enableLayer": {
-                //     let layer = s.layers.find(({layerId}) => layerId === action.layerId);
-                //     if (layer) {
-                //         layer.enabled = action.enabled;
-                //         return true;
-                //     } else {
-                //         return false;
-                //     }
-                // }
-                //
-                // case "deleteLayer":
-                //     s.layers = s.layers.filter(layer => layer.layerId !== action.layerId);
-                //     return true;
+                case "updateItem":
+                    throw new Error("audio/updateItem not implemented");
+
+                case "deleteItem":
+                    if (s.items[action.itemId]) {
+                        if (s.items[action.itemId].sourceNode) {
+                            s.items[aciton.itemId].sourceNode.disconnect();
+                        }
+                        delete s.items[action.itemId];
+                    }
+                    return true;
 
                 case "addTransportTimeCallback":
                     if (s.transportTimeCallbacks.indexOf(action.callback) === -1) {
@@ -160,6 +154,20 @@ export default store => next => {
                     return true;
             }
         } else {
+            // We just watch these actions going past.
+            switch (action.type) {
+                case "LANE_ADDED": // Fall through
+                case "LANE_UPDATED":
+                    if (action.lane.enabled) {
+                        enableLane(action.lane.laneId);
+                    } else {
+                        disableLane(action.lane.laneId);
+                    }
+                    break;
+                case "LANE_DELETED":
+                    disableLane(action.laneId);
+                    break;
+            }
             return next(action);
         }
     };

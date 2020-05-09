@@ -118,7 +118,7 @@ export const loadProject = (projectId, conduct = false) => async dispatch => {
     dispatch(projectLoaded(project));
 }
 
-export const projectLoaded = ({project, lanes, items}) => async dispatch => {
+export const projectLoaded = ({project, lanes, items, users}) => async dispatch => {
 
     for (let item of items) {
         let audioItem = await dispatch({
@@ -127,13 +127,25 @@ export const projectLoaded = ({project, lanes, items}) => async dispatch => {
         });
         item.duration = audioItem.duration;
         item.rms = audioItem.rms;
+
+        dispatch({
+            type: "ITEM_ADDED",
+            item,
+        });
     }
+
+    for (let lane of lanes) {
+        dispatch({
+            type: "LANE_ADDED",
+            lane,
+        });
+    }
+
 
     dispatch({
         type: "PROJECT_LOADED",
         project,
-        lanes,
-        items,
+        users,
     });
 };
 

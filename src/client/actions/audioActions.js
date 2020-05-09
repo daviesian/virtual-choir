@@ -55,7 +55,7 @@ export const stopCalibration = () => async dispatch => {
 export const loadItem = (item, lane, user) => async (dispatch, getState) => {
     // TODO: Make sure the user exists
 
-    if (!lane.laneId in getState().lanes) {
+    if (!(lane.laneId in getState().lanes)) {
         await dispatch({
             type: "LANE_ADDED",
             lane,
@@ -73,57 +73,63 @@ export const loadItem = (item, lane, user) => async (dispatch, getState) => {
     })
 };
 
-// export const loadSingerLayer = (layer) => async (dispatch, getState) => {
-//
-//     let addedLayer = await dispatch({
-//         type: "audio/addLayer",
-//         ...layer,
-//     });
-//
-//     dispatch({
-//         type: "LAYER_ADDED",
-//         startTime: layer.startTime,
-//         duration: addedLayer.duration,
-//         layerId: layer.layerId,
-//         rms: addedLayer.rms,
-//         name: layer.name,
-//         enabled: layer.enabled,
-//     });
-//
-//     window.videos[layer.layerId] = `/.layers/${layer.layerId}.vid`;//await (await fetch()).blob();
-//
-// };
-//
-// export const updateLayer = (layer, them=false) => async (dispatch, getState) => {
-//
-//     if (them) {
-//         dispatch({
-//             type: "ws/call",
-//             fn: "updateLayer",
-//             kwargs: { layer },
-//         });
-//     }
-//
-//     let state = getState();
-//     if (layer.enabled && !state.layers.find((l) => l.layerId === layer.layerId)) {
-//         await dispatch(loadSingerLayer(layer));
-//     }
-//
-//     dispatch({
-//         type: "audio/enableLayer",
-//         layerId: layer.layerId,
-//         enabled: layer.enabled,
-//     });
-//
-//     dispatch({
-//         type: "LAYER_UPDATE",
-//         layer,
-//     });
-//
-//     if (!getState().conducting) {
-//         dispatch(singerState(getState()));
-//     }
-// };
+export const updateLane = (lane, items, user, them=false) => async (dispatch, getState) => {
+    if (them) {
+        dispatch({
+            type: "ws/call",
+            fn: "updateLane",
+            kwargs: { lane },
+        });
+    }
+
+    // Load items we don't know about in a newly-enabled lane
+    if (items && lane.enabled) {
+        let knownItems = getState().items;
+        for (let item of items || []) {
+            if (!(item.itemId in knownItems)) {
+                await dispatch(loadItem(item, lane, user))
+            }
+        }
+    }
+
+    await dispatch({
+        type: "audio/updateLane",
+        lane,
+    });
+
+    dispatch({
+        type: "LANE_UPDATED",
+        lane,
+    });
+
+    if (!getState().conducting) {
+        dispatch(singerState(getState()));
+    }
+};
+
+export const updateItem = (item, them=false) => async (dispatch, getState) => {
+    if (them) {
+        dispatch({
+            type: "ws/call",
+            fn: "updateItem",
+            kwargs: { item },
+        });
+    }
+
+    await dispatch({
+        type: "audio/updateItem",
+        item,
+    });
+
+    dispatch({
+        type: "ITEM_UPDATED",
+        item,
+    });
+
+    if (!getState().conducting) {
+        dispatch(singerState(getState()));
+    }
+};
 
 export const play = (startTime, me=true, them=false) => async (dispatch, getState) => {
 
@@ -231,34 +237,6 @@ export const stopRecording = (me=true, them=false) => async (dispatch, getState)
         }
     }
 };
-//
-// export const recordingFinished = (layerId, audioData, startTime) => async (dispatch, getState) => {
-//
-//     let addedLayer = await dispatch({
-//         type: "audio/addLayer",
-//         audioData,
-//         startTime,
-//         layerId,
-//     });
-//
-//     dispatch({
-//         type: "LAYER_ADDED",
-//         startTime: startTime,
-//         duration: addedLayer.duration,
-//         layerId,
-//         rms: addedLayer.rms,
-//         name: getState().user.name,
-//         conductor: true,
-//         enabled: false,
-//     });
-//
-//     await dispatch({
-//         type: "ws/call",
-//         fn: "newLayer",
-//         kwargs: { layerId, startTime, backingTrackId: getState().backingTrack.backingTrackId },
-//         data: audioData,
-//     });
-// };
 
 export const recordingFinished = (itemId, videoFileBlobs, referenceOutputData, referenceOutputStartTime) => async (dispatch, getState) => {
     let data = new Uint8Array(videoFileBlobs.reduce((totalSize, blob) => totalSize + blob.size, 0) + referenceOutputData.byteLength);
@@ -286,26 +264,49 @@ export const recordingFinished = (itemId, videoFileBlobs, referenceOutputData, r
     });
 };
 
-// export const deleteLayer = (layerId, them) => async (dispatch, getState) => {
-//
-//     if (them) {
-//         dispatch({
-//             type: "ws/call",
-//             fn: "deleteLayer",
-//             kwargs: { layerId },
-//         });
-//     }
-//
-//     await dispatch({
-//         type: "audio/deleteLayer",
-//         layerId,
-//     });
-//
-//     dispatch({
-//         type: "LAYER_DELETED",
-//         layerId,
-//     });
-// };
+export const deleteItem = (itemId, them) => async (dispatch, getState) => {
+    if (them) {
+        dispatch({
+            type: "ws/call",
+            fn: "deleteItem",
+            kwargs: { itemId },
+        });
+    }
+
+    await dispatch({
+        type: "audio/deleteItem",
+        itemId,
+    });
+
+    dispatch({
+        type: "ITEM_DELETED",
+        itemId,
+    });
+}
+
+export const deleteLane = (laneId, them) => async (dispatch, getState) => {
+    for (let [itemId, item] of Object.entries(getState().items || {})) {
+        if (item.laneId === laneId) {
+            await dispatch({
+                type: "audio/deleteItem",
+                itemId,
+            });
+        }
+    }
+
+    if (them) {
+        dispatch({
+            type: "ws/call",
+            fn: "deleteLane",
+            kwargs: { laneId },
+        });
+    }
+
+    dispatch({
+        type: "LANE_DELETED",
+        laneId,
+    })
+}
 
 
 export const seek = (time, me=true, them=false) => async (dispatch, getState) => {

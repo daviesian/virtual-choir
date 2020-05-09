@@ -3,9 +3,19 @@ import {v4 as uuid} from "uuid";
 import * as db from "./data";
 import {
     ensureRoomExists,
-    getProject, listProjects,
+    getProject,
+    listProjects,
     openDB,
-    saveRoom, listLanes, listItems, addItem, addLane, getLane
+    saveRoom,
+    listLanes,
+    listItemsByProject,
+    addItem,
+    addLane,
+    getLane,
+    listUsers,
+    deleteItem,
+    listItemsByLane,
+    deleteLane, saveLane, saveItem, getUser
 } from "./data";
 
 let video = require("../../build/Release/video.node");
@@ -47,6 +57,10 @@ let align = (itemId) => {
 // process.exit(0);
 
 // Useful background: https://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
+
+let tryDeleteFile = fileName => {
+    try { fs.unlinkSync(fileName); } catch (e) { }
+}
 
 log.setDefaultLevel("trace");
 
@@ -148,6 +162,16 @@ let maybeDestroyRoom = room => {
     }
 };
 
+let _deleteItem = async (client, {itemId}) => {
+    conduct(client.room, {"cmd": "deleteItem", itemId});
+    requireUuid(itemId);
+    tryDeleteFile(`.items/${itemId}.aud`);
+    tryDeleteFile(`.items/${itemId}.vid`);
+    tryDeleteFile(`.items/${itemId}.original.vid`);
+    tryDeleteFile(`.items/${itemId}.reference.aud`);
+    await deleteItem(itemId);
+}
+
 let messageHandlers = {
     updateUser: async (client, {user}) => {
         if (client.user.userId === user.userId) {
@@ -234,13 +258,14 @@ let messageHandlers = {
     loadProject: async (client, {projectId, conduct}) => {
         let project = await getProject(projectId);
         let lanes = await listLanes(projectId);
-        let items = await listItems(projectId);
+        let items = await listItemsByProject(projectId);
+        let users = await listUsers(projectId);
         if (client.conducting && conduct) {
             roomLog(client.room, `Loading project ${projectId}`);
             await saveRoom({...client.room, currentProjectId: projectId});
-            conduct(client.room, {cmd: "loadProject", project, lanes, items});
+            conduct(client.room, {cmd: "loadProject", project, lanes, items, users});
         }
-        return {project, lanes, items};
+        return {project, lanes, items, users};
     },
     play: (client, {startTime}) => {
         requireConductor(client);
@@ -301,30 +326,49 @@ let messageHandlers = {
         if (!lane) {
             // No valid lane was provided. Create a new lane for this user.
             laneId = uuid();
-            lane = await addLane(laneId, client.room.currentProjectId, client.user.userId, '', true);
+            let laneIdx = (await listLanes(client.room.currentProjectId)).length;
+            lane = await addLane(laneId, client.room.currentProjectId, client.user.userId, '', laneIdx, true);
         }
-        let item = await addItem(itemId, laneId, referenceOutputStartTime+offset, 0, 0, 0, `/.items/${itemId}.aud`, `/.items/${itemId}.vid`);
+        let itemIdx = (await listItemsByProject(client.room.currentProjectId)).filter(i => i.laneId === lane.laneId).length;
+        let item = await addItem(itemId, laneId, referenceOutputStartTime+offset, 0, 0, itemIdx, `/.items/${itemId}.aud`, `/.items/${itemId}.vid`);
 
         client.room.conductor?.sendJSON({cmd: "newItem", item, lane, user: client.user});
     },
-    // getLayers: async (client, {roomId, backingTrackId}) => {
-    //     return await db.getLayers(roomId, backingTrackId);
-    // },
+    deleteItem: async (client, {itemId}) => {
+        requireConductor(client);
+        let item = await db.getItem(itemId);
+        if (item) {
+            await _deleteItem(client, item);
+        }
+    },
+    deleteLane: async (client, {laneId}) => {
+        requireConductor(client);
+        let lane = await db.getLane(laneId);
+        if (lane) {
+            for (let item of await listItemsByLane(laneId)) {
+                await _deleteItem(client, item);
+            }
+            conduct(client.room, {cmd: "deleteLane", laneId});
+            await deleteLane(laneId);
+        }
+    },
+    updateLane: async (client, {lane}) => {
+        requireConductor(client); // TODO: Or owner of lane.
+        await saveLane(lane);
+        let items = await listItemsByLane(lane.laneId);
+        let user = await getUser(lane.userId);
+        conduct(client.room, {cmd: "updateLane", lane, items, user});
+    },
+    updateItem: async (client, {item}) => {
+        requireConductor(client); // TODO: Or owner of item.
+        await saveItem(item);
+        conduct(client.room, {cmd: "updateItem", item});
+    },
     // updateLayer: async (client, {layer}) => {
     //     requireConductor(client);
     //     // TODO: Update more than just 'enabled'
     //     let updatedLayer = await updateLayer(layer);
     //     conduct(client.room, {cmd: "updateLayer", layer: updatedLayer});
-    // },
-    // deleteLayer: async (client, {layerId}) => {
-    //     requireUuid(layerId);
-    //     requireConductor(client);
-    //     conduct(client.room, {cmd: "deleteLayer", layerId});
-    //     await deleteLayer(layerId);
-    //     try { fs.unlinkSync(`.layers/${layerId}.original.vid`); } catch (e) { }
-    //     try { fs.unlinkSync(`.layers/${layerId}.reference.aud`); } catch (e) { }
-    //     try { fs.unlinkSync(`.layers/${layerId}.vid`); } catch (e) { }
-    //     try { fs.unlinkSync(`.layers/${layerId}.aud`); } catch (e) { }
     // },
     setRehearsalState: async (client, {roomId, rehearsalState}) => {
         requireConductor(client);

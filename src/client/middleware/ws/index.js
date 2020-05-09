@@ -2,11 +2,12 @@ import RSVP from "rsvp";
 import log from 'loglevel';
 const queryString = require('query-string');
 import {
+    deleteItem, deleteLane,
     loadItem,
     play, seek,
     startRecording,
     stop,
-    stopRecording,
+    stopRecording, updateItem, updateLane,
 } from "../../actions/audioActions";
 import {
     projectLoaded,
@@ -50,9 +51,6 @@ export default store => next => {
 
             store.dispatch(setUser(user));
         },
-        loadBackingTrack: ({track}) => {
-            store.dispatch(loadBackingTrack(track));
-        },
         loadProject: (project) => {
             store.dispatch(projectLoaded(project));
         },
@@ -74,17 +72,20 @@ export default store => next => {
         updateSingerState: ({user, state}) => {
             store.dispatch(updateSingerState(user, state));
         },
-        // newSingerLayer: ({layer}) => {
-        //     store.dispatch(loadSingerLayer(layer));
-        // },
-        // updateLayer: ({layer}) => {
-        //     store.dispatch(updateLayer(layer));
-        // },
-        // deleteLayer: ({layerId}) => {
-        //     store.dispatch(deleteLayer(layerId));
-        // },
+        updateLane: ({lane, items, user}) => {
+            store.dispatch(updateLane(lane, items, user,false));
+        },
+        updateItem: ({item}) => {
+            store.dispatch(updateItem(item, false));
+        },
         newItem: ({item, lane, user}) => {
             store.dispatch(loadItem(item, lane, user))
+        },
+        deleteItem: ({itemId}) => {
+            store.dispatch(deleteItem(itemId, false));
+        },
+        deleteLane: ({laneId}) => {
+            store.dispatch(deleteLane(laneId, false));
         },
         singerJoined: ({user}) => {
             store.dispatch(singerJoined(user));
@@ -101,12 +102,6 @@ export default store => next => {
                 data,
                 _log: false,
             });
-        },
-        newSingerClip: ({clip}) => {
-            store.dispatch(loadSingerClip(clip));
-        },
-        deleteClip: ({clipId}) => {
-            store.dispatch(deleteClip(clipId))
         },
         nowSpeaking: ({user}) => {
             store.dispatch(nowSpeaking(user));
