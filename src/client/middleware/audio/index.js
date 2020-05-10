@@ -126,6 +126,16 @@ export default store => next => {
                     }
                     return stopRecord();
 
+                case "clearAll":
+                    for (let item of Object.values(s.items)) {
+                        if (item.sourceNode) {
+                            item.sourceNode.disconnect();
+                        }
+                    }
+                    s.items = {};
+                    s.enabledLanes = {};
+                    return true;
+
                 case "loadItem":
                     return await loadItem(action.item);
 

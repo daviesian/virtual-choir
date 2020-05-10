@@ -32,6 +32,8 @@ const initialState = {
     targetLaneId: null,
     items: {},
     lanes: {},
+    room: null,
+    muted: true,
 };
 
 let rootReducer = produce((state, action) => {
@@ -42,10 +44,26 @@ let rootReducer = produce((state, action) => {
 
         case "SET_USER":
             state.user = action.user;
+            state.users[action.user.userId] = {
+                user: action.user,
+                state: null,
+                online: true,
+            };
             break
 
         case "SET_CONDUCTING":
             state.conducting = action.conducting;
+            if (action.conducting && state.room) {
+                state.room.conductorUserId = state.user?.userId;
+            }
+            break;
+
+        case "CONDUCTOR_UPDATED":
+            state.room.conductorUserId = action.conductorUserId;
+            break;
+
+        case "JOINED_ROOM":
+            state.room = action.room;
             break;
 
         case "INIT_AUDIO_DEVICES":
@@ -94,15 +112,19 @@ let rootReducer = produce((state, action) => {
             delete state.calibration;
             return;
 
+        case "CLEAR_PROJECT":
+            state.project = null;
+            state.targetLaneId = null;
+            state.items = {};
+            state.lanes = {};
+            for (let [uid,user] of Object.entries(state.users)) {
+                if (!user.online) {
+                    delete state.users[uid];
+                }
+            }
+            break;
+
         case "PROJECT_LOADED":
-            // state.project = {
-            //     name: action.name,
-            //     duration: action.duration,
-            //     backingTrackId: action.backingTrackId,
-            //     url: action.url,
-            //     rms: action.rms,
-            //     lyrics: action.lyrics,
-            // };
             state.project = action.project;
             for (let user of action.users || []) {
                 if (!(user.userId in state.users)) {
@@ -138,6 +160,9 @@ let rootReducer = produce((state, action) => {
                 }
             }
             delete state.lanes[action.laneId];
+            if (state.targetLaneId === action.laneId) {
+                state.targetLaneId = null;
+            }
             break;
 
         case "ITEM_DELETED":
@@ -164,32 +189,9 @@ let rootReducer = produce((state, action) => {
             state.transport.state = null;
             break;
 
-        // case "LAYER_ADDED":
-        //     state.layers = state.layers.filter(l => l.layerId !== action.layerId);
-        //     state.layers.push({
-        //         startTime: action.startTime,
-        //         duration: action.duration,
-        //         layerId: action.layerId,
-        //         name: action.name,
-        //         rms: action.rms,
-        //         enabled: action.enabled,
-        //     });
-        //     break;
-        //
-        // case "LAYER_UPDATE": {
-        //     let layer = state.layers.find(({layerId}) => layerId === action.layer.layerId)
-        //     // TODO: Allow updating more stuff
-        //     if (layer) {
-        //         layer.enabled = action.layer.enabled;
-        //     } else {
-        //         throw new Error(`Cannot enable non-existent layer: ${action.layer.layerId}`);
-        //     }
-        //     break;
-        // }
-        //
-        // case "LAYER_DELETED":
-        //     state.layers = state.layers.filter(layer => layer.layerId !== action.layerId);
-        //     break;
+        case "SET_TARGET_LANE":
+            state.targetLaneId = action.laneId;
+            break;
 
         case "SEND_PROGRESS":
             state.sending[action.transferId] = {
@@ -239,6 +241,10 @@ let rootReducer = produce((state, action) => {
 
         case "NOW_SPEAKING":
             state.speaker = action.user;
+            break;
+
+        case "SET_MUTED":
+            state.muted = action.muted;
             break;
     }
 }, initialState);

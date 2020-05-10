@@ -19,7 +19,7 @@ const useStyles = makeStyles(theme => ({
 }));
 
 
-let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch, ...props}) => {
+let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch, className}) => {
     let classes = useStyles();
 
     let currentLineRef = useRef();
@@ -53,7 +53,7 @@ let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch, ...p
         }
     }, [scrollLine?.id]);
 
-    return <Paper square elevation={0} style={{minHeight: 0, overflow: 'auto'}}>
+    return <Paper square elevation={0} style={{minHeight: 0, overflow: 'auto'}} className={className}>
         <List className={classes.lyricsBlock}>
             {lyricLines}
         </List>

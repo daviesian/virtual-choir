@@ -43,11 +43,11 @@ const useStyles = makeStyles(theme => ({
     }
 }));
 
-let Sidebar = ({className, users, user, dispatch}) => {
+let Sidebar = ({className, users, user, conductorUserId, dispatch}) => {
 
     let classes = useStyles();
 
-    let singerList = Object.entries(users).filter(([userId, u]) => userId !== user?.userId).map(([userId, u]) => {
+    let singerList = Object.entries(users)/*.filter(([userId, u]) => userId !== user?.userId)*/.map(([userId, u]) => {
         let s = {...u};
         let sends = Object.entries(s.state?.sending || {});
         s.uploadProgress = null;
@@ -57,22 +57,42 @@ let Sidebar = ({className, users, user, dispatch}) => {
         return s;
     });
 
+    singerList.sort((a,b) => {
+        if (a.user.userId === conductorUserId) {
+            return -1;
+        } else if (b.user.userId === conductorUserId) {
+            return 1;
+        } else if (a.user.userId === user.userId) {
+            return -1;
+        } else if (b.user.userId === user.userId) {
+            return 1;
+        } else if (a.online && !b.online) {
+            return -1;
+        } else if (b.online && !a.online) {
+            return 1;
+        } else if (a.user.name < b.user.name) {
+            return -1;
+        } else {
+            return 1;
+        }
+    });
+
+
     return <Paper elevation={0} square className={clsx(className, classes.root)}>
         <List>
-
             {singerList.map(singer => <div key={singer.user.userId}>
                 <ListItem>
                     {<ListItemAvatar>
-                        <Avatar variant={"rounded"} className={clsx({
-                            [classes.play]: singer.state?.playing && !singer.state?.recording,
-                            [classes.record]: singer.state?.recording,
-                            [classes.pause]: !singer.state?.playing && !singer.state?.recording,
+                        <Avatar className={clsx({
+                            [classes.play]: singer.state?.state === 'playing' && singer.state?.state !== 'recording',
+                            [classes.record]: singer.state?.state === 'recording',
+                            [classes.pause]: singer.state?.state !== 'playing' && singer.state?.state !== 'recording',
                         })}>
-                            {singer.state?.recording ? <FiberManualRecordIcon/> : singer.state?.playing ? <PlayArrowIcon/> : <PauseIcon/>}
+                            {singer.state === 'recording' ? <FiberManualRecordIcon/> : singer.state?.state === 'playing' ? <PlayArrowIcon/> : <PauseIcon/>}
                         </Avatar>
                     </ListItemAvatar>}
 
-                        <ListItemText primary={`${singer.user.name} ${ singer.online || singer.user.userId === user?.userId ? '' : '(Offline)'}`} secondary={`${singer.user?.voice || 'Singer'}`}/>
+                        <ListItemText primary={`${singer.user.name} ${ singer.online || singer.user.userId === user?.userId || singer.user.userId === conductorUserId ? '' : '(Offline)'}`} secondary={`${singer.user?.voice || 'Singer'}`}/>
 
                     <CircularProgress size={50} className={classes.uploadProgress} variant="static" value={singer.uploadProgress}/>
                 </ListItem>
@@ -86,6 +106,6 @@ let Sidebar = ({className, users, user, dispatch}) => {
 
 export default connect(state => ({
     users: state.users,
-    conductor: state.conductor,
+    conductorUserId: state.room?.conductorUserId,
     user: state.user,
 }))(Sidebar);

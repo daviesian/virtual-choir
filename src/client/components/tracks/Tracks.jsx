@@ -11,12 +11,10 @@ import purple from "@material-ui/core/colors/purple";
 import teal from "@material-ui/core/colors/teal";
 import Typography from "@material-ui/core/Typography";
 import Slider from "@material-ui/core/Slider";
-import ZoomSlider from "./ZoomSlider";
 import format from "format-duration";
 import grey from "@material-ui/core/colors/grey";
 import blueGrey from "@material-ui/core/colors/blueGrey";
-import TransportCursor from "./TransportCursor";
-import {deleteItem, deleteLane, seek, updateLane} from "../actions/audioActions";
+import {deleteItem, deleteLane, seek, updateLane} from "../../actions/audioActions";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteIcon from "@material-ui/icons/Delete";
 import Menu from "@material-ui/core/Menu";
@@ -24,6 +22,12 @@ import MenuItem from "@material-ui/core/MenuItem";
 import VolumeOffIcon from '@material-ui/icons/VolumeOff';
 import VolumeUpIcon from '@material-ui/icons/VolumeUp';
 import Grid from "@material-ui/core/Grid";
+import LinearProgress from "@material-ui/core/LinearProgress";
+import FiberManualRecordIcon from "@material-ui/icons/FiberManualRecord";
+import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import PauseIcon from "@material-ui/icons/Pause";
+import {green, red} from "@material-ui/core/colors";
+import LaneHeader from "./LaneHeader";
 
 let useStyles = makeStyles(theme => ({
     root: {
@@ -48,18 +52,9 @@ let useStyles = makeStyles(theme => ({
         borderTop: [["1px solid", blueGrey[100]]],
         padding: theme.spacing(1),
     },
-    headerRight: {
-        textAlign: 'right',
-    },
     disabledHeader: {
         opacity: 0.5,
         backgroundColor: grey[200],
-    },
-    laneName: {
-        marginRight: theme.spacing(1),
-    },
-    laneUser: {
-
     },
     lane: {
         gridColumn: '2 / 3',
@@ -74,8 +69,8 @@ let useStyles = makeStyles(theme => ({
         height: '100%',
         position: 'absolute',
         top: 0,
-        width: ({zoom, endTime}) => zoom*endTime,
-        left: ({zoom, rangeStart}) => -zoom*rangeStart + theme.spacing(1),
+        //width: ({zoom, endTime}) => zoom*endTime,
+        //left: ({zoom, rangeStart}) => -zoom*rangeStart + theme.spacing(1),
     },
     disabledLane: {
         backgroundColor: blueGrey[400],
@@ -117,7 +112,8 @@ let useStyles = makeStyles(theme => ({
         width: 2,
         backgroundColor: theme.palette.primary[500],
         pointerEvents: 'none',
-    }
+    },
+
 }));
 
 const selectUserLanes = createSelector(state => ({
@@ -125,26 +121,50 @@ const selectUserLanes = createSelector(state => ({
     lanes: state.lanes,
     items: state.items,
     user: state.user,
-}), ({users, lanes, items, user}) => {
+    transportState: state.transport.state,
+    targetLaneId: state.targetLaneId,
+    conductorUserId: state.room?.conductorUserId,
+}), ({users, lanes, items, user, transportState, targetLaneId, conductorUserId}) => {
+    let me = user;
     let r = [];
     // TODO: Sort users, sort lanes, sort items
     for (let [uid, user] of Object.entries(users || {})) {
         let userLanes = Object.values(lanes || {}).filter(lane => lane.userId === uid).map(lane => {
             return {
                 items: Object.values(items || {}).filter(item => item.laneId === lane.laneId),
+                originalLane: lane,
                 ...lane
             };
         });
+
+        let sends = Object.entries(user.state?.sending || {});
+        let uploadProgress = null;
+        if (sends.length > 0) {
+            uploadProgress = 100 * sends[0][1].sentBytes / sends[0][1].totalBytes;
+        }
+
         r.push({
             lanes: userLanes,
-            targetLane: userLanes[0], // Can quite happily be undefined
+            uploadProgress,
+            transportState: uid === me.userId ? transportState : user.state?.state,
+            targetLaneId: uid === me.userId ? targetLaneId : user.state?.targetLaneId,
+            conductor: uid === conductorUserId,
             ...user,
         });
     }
+
     r.sort((a,b) => {
-        if (a.user.userId === user.userId) {
+        if (a.user.userId === conductorUserId) {
+            return -1;
+        } else if (b.user.userId === conductorUserId) {
+            return 1;
+        } else if (a.user.userId === user.userId) {
             return -1;
         } else if (b.user.userId === user.userId) {
+            return 1;
+        } else if (a.online && !b.online) {
+            return -1;
+        } else if (b.online && !a.online) {
             return 1;
         } else if (a.user.name < b.user.name) {
             return -1;
@@ -201,13 +221,14 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
         }
     }, [endTime, range, timeSlider.current]);
 
-    let classes = useStyles({sidebarWidth, zoom, endTime, rangeStart: range[0]});
+    let classes = useStyles({sidebarWidth/*, zoom, endTime, rangeStart: range[0]*/});
 
     let laneClick = useCallback(e => {
-        dispatch(seek(range[0] + ((e.pageX - sidebarWidth)/zoom), true, conducting))
+        dispatch(seek(range[0] + ((e.pageX - sidebarWidth - 8)/zoom), true, conducting))
     });
 
     let slide = v => {
+
         if (v[1] !== range[1]) {
             // Adjust position
             let dt = v[1]-range[1];
@@ -233,39 +254,49 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
         setItemContextMenu(itemContextMenuInitialState);
     });
 
+
+
     return <Paper square elevation={0} className={clsx(classes.root, className)}>
         <div className={classes.tracks}>
-            {users.map((user,ui) => user.lanes.map((lane,li) => {
-                let firstUserLane = li === 0;
-                return <React.Fragment key={`${ui}-${li}`}>
-                    <Grid container className={clsx(classes.header, firstUserLane && classes.firstUserLane, lane.enabled || classes.disabledHeader)}>
-                        <Grid item xs>
-                            {firstUserLane && <Typography variant={"h6"} className={classes.laneUser}>{user.user.name}</Typography>}
-                        </Grid>
-                        <Grid item xs className={classes.headerRight}>
-                            <Typography className={classes.laneName} variant={"body1"}>{lane.name || `${user.user.name} ${li+1}`}</Typography>
-                            <IconButton size={'small'} onClick={() => dispatch(deleteLane(lane.laneId, conducting))}><DeleteIcon/></IconButton>
-                            <IconButton size={'small'} onClick={() => dispatch(updateLane({...lane, enabled: !lane.enabled}, null, null, conducting))}>
-                                {lane.enabled ? <VolumeUpIcon/> : <VolumeOffIcon/>}
-                            </IconButton>
-                        </Grid>
-                    </Grid>
-                    <div className={clsx(classes.lane, firstUserLane && classes.firstUserLane, lane.enabled || classes.disabledLane)}>
-                        <div className={classes.laneInner} onClick={laneClick}>
-                            {lane.items.map((item, ii) => <Paper key={ii}
-                                                                 className={clsx(classes.item, lane.enabled || classes.disabledItem)}
-                                                                 elevation={3}
-                                                                 onContextMenu={e => itemRightClick(e, item)}
-                                                                 style={{
-                                                                     left: zoom*item.startTime,
-                                                                     width: zoom*item.duration,
-                                                                     backgroundImage: `url(${item.rms})`,
-                                                                     backgroundSize: '100% 100%',
-                                                                     backgroundRepeat: 'no-repeat',
-                                                                 }}/>)}
-                        </div>
-                    </div>
-                </React.Fragment>}))}
+            {users.map((user,ui) => {
+
+                return <React.Fragment key={`${ui}`}>
+                    {user.lanes.map((lane, li) => {
+                        let firstUserLane = li === 0;
+                        let lastUserLane = user.targetLaneId && li === user.lanes.length - 1;
+                        return <React.Fragment key={`${ui}-${li}`}>
+                            <LaneHeader
+                                className={clsx(classes.header, firstUserLane && classes.firstUserLane, lane.enabled || classes.disabledHeader)}
+                                firstUserLane={firstUserLane} lastUserLane={lastUserLane} user={user} lane={lane}
+                                laneIndex={li}/>
+                            <div className={clsx(classes.lane, firstUserLane && classes.firstUserLane, lane.enabled || classes.disabledLane)}>
+                                <div className={classes.laneInner}
+                                     onClick={laneClick}
+                                     style={{
+                                         width: zoom * endTime,
+                                         left: -zoom * range[0] + 8,
+                                     }}>
+                                    {lane.items.map((item, ii) => <Paper key={ii}
+                                                                         className={clsx(classes.item, lane.enabled || classes.disabledItem)}
+                                                                         elevation={3}
+                                                                         onContextMenu={e => itemRightClick(e, item)}
+                                                                         style={{
+                                                                             left: zoom * item.startTime,
+                                                                             width: zoom * item.duration,
+                                                                             backgroundImage: `url(${item.rms})`,
+                                                                             backgroundSize: '100% 100%',
+                                                                             backgroundRepeat: 'no-repeat',
+                                                                         }}/>)}
+                                </div>
+                            </div>
+                        </React.Fragment>
+                    })}
+                    {(user.targetLaneId === null || user.lanes.length === 0) && <><LaneHeader
+                        className={clsx(classes.header, classes.firstUserLane)}
+                        firstUserLane={user.lanes.length === 0} lastUserLane={true} user={user}/>
+                    <div className={classes.lane}/></>}
+                </React.Fragment>;
+            })}
             <div className={clsx(classes.fixedBottomRow, classes.timeDisplay)}>
                 <Typography variant={"h6"} className={classes.timer}>{format(transportTime*1000)}{endTime && ` / ${format(endTime*1000)}`}</Typography>
             </div>

@@ -7,7 +7,7 @@ import {
     play, seek,
     startRecording,
     stop,
-    stopRecording, updateItem, updateLane,
+    stopRecording, targetLane, updateItem, updateLane,
 } from "../../actions/audioActions";
 import {
     projectLoaded,
@@ -20,7 +20,7 @@ import {
 } from "../../actions";
 import {nowSpeaking} from "../../actions/rtcActions";
 
-const BINARY_CHUNK_SIZE = 64000;
+const BINARY_CHUNK_SIZE = 128000;
 
 
 export default store => next => {
@@ -75,6 +75,9 @@ export default store => next => {
         updateLane: ({lane, items, user}) => {
             store.dispatch(updateLane(lane, items, user,false));
         },
+        setTargetLane: ({userId, laneId}) => {
+            store.dispatch(targetLane(userId, laneId, false));
+        },
         updateItem: ({item}) => {
             store.dispatch(updateItem(item, false));
         },
@@ -105,6 +108,12 @@ export default store => next => {
         },
         nowSpeaking: ({user}) => {
             store.dispatch(nowSpeaking(user));
+        },
+        updateRoomConductor: ({conductorUserId}) => {
+            store.dispatch({
+                type: "CONDUCTOR_UPDATED",
+                conductorUserId,
+            });
         }
     };
 

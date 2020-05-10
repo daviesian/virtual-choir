@@ -44,10 +44,24 @@ export const nowSpeaking = (user) => ({
     user,
 });
 
-export const rtcMute = () => ({
-    type: "rtc/mute",
-});
+export const rtcMute = () => dispatch => {
+    dispatch({
+        type: "rtc/mute",
+    });
 
-export const rtcUnmute = () => ({
-    type: "rtc/unmute",
-})
+    dispatch({
+        type: "SET_MUTED",
+        muted: true,
+    });
+}
+
+export const rtcUnmute = () => dispatch => {
+    dispatch({
+        type: "rtc/unmute",
+    });
+
+    dispatch({
+        type: "SET_MUTED",
+        muted: false,
+    });
+}

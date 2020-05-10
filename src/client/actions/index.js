@@ -1,4 +1,4 @@
-import {loadSingerLayer} from "./audioActions";
+import {loadSingerLayer, targetLane} from "./audioActions";
 import parseSRT from 'parse-srt'
 import Peer from 'simple-peer';
 
@@ -10,24 +10,20 @@ export const toast = (message, level='info') => ({
 });
 
 export const requestJoinRoom = (roomId) => async (dispatch) => {
-    let dbRoom = await dispatch({
+    let room = await dispatch({
         type: "ws/call",
         fn: "joinRoom",
         kwargs: { roomId },
     });
 
-    log.info(`Joined room '${roomId}':`, dbRoom);
-    if (dbRoom?.currentProjectId) {
-        await dispatch(loadProject(dbRoom.currentProjectId, false));
+    await dispatch({
+        type: "JOINED_ROOM",
+        room,
+    });
 
-        // let layers = await dispatch({
-        //     type: "ws/call",
-        //     fn: "getLayers",
-        //     kwargs: { roomId, backingTrackId: dbRoom.currentBackingTrackId },
-        // });
-        // for (let layer of layers) {
-        //     await dispatch(loadSingerLayer(layer))
-        // }
+    log.info(`Joined room '${roomId}':`, room);
+    if (room?.currentProjectId) {
+        await dispatch(loadProject(room.currentProjectId, false));
     }
 };
 
@@ -64,6 +60,8 @@ export const singerState = state => ({
             state: state.transport?.state,
             projectId: state.project?.projectId,
             loadedItems: Object.keys(state.items),
+            targetLaneId: state.targetLaneId,
+            muted: state.muted,
         }
     },
 });
@@ -108,7 +106,19 @@ export const sendProgress = (transferId, sentBytes, totalBytes, coarseUpdate=fal
 
 };
 
+export const createProject = name => async dispatch => {
+
+    let project = await dispatch({
+        type: "ws/call",
+        fn: "createProject",
+        kwargs: { name },
+    });
+
+    dispatch(projectLoaded(project));
+};
+
 export const loadProject = (projectId, conduct = false) => async dispatch => {
+
     let project = await dispatch({
         type: "ws/call",
         fn: "loadProject",
@@ -118,7 +128,14 @@ export const loadProject = (projectId, conduct = false) => async dispatch => {
     dispatch(projectLoaded(project));
 }
 
-export const projectLoaded = ({project, lanes, items, users}) => async dispatch => {
+export const projectLoaded = ({project, lanes, items, users}) => async (dispatch, getState)=> {
+
+    dispatch({
+        type: "CLEAR_PROJECT",
+    });
+    dispatch({
+        type: "audio/clearAll",
+    });
 
     for (let item of items) {
         let audioItem = await dispatch({
@@ -134,18 +151,37 @@ export const projectLoaded = ({project, lanes, items, users}) => async dispatch 
         });
     }
 
+    let myTargetLane = null;
+    let myUserId = getState().user?.userId;
     for (let lane of lanes) {
         dispatch({
             type: "LANE_ADDED",
             lane,
         });
+        if (lane.userId === myUserId) {
+            myTargetLane = lane.laneId;
+        }
     }
 
+    if (myTargetLane) {
+        dispatch(targetLane(myUserId, myTargetLane, false));
+    }
 
     dispatch({
         type: "PROJECT_LOADED",
         project,
         users,
+    });
+};
+
+export const uploadItem = file => async (dispatch) => {
+    let buffer = new Uint8Array(await file.arrayBuffer());
+
+    dispatch({
+        type: "ws/call",
+        fn: "uploadItem",
+        kwargs: { name: file.name },
+        data: buffer,
     });
 };
 

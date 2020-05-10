@@ -56,6 +56,10 @@ export const loadItem = (item, lane, user) => async (dispatch, getState) => {
     // TODO: Make sure the user exists
 
     if (!(lane.laneId in getState().lanes)) {
+        if (user.userId === getState().user?.userId && !getState().targetLaneId) {
+            // This is my lane, and I don't have a target.
+            await dispatch(targetLane(user.userId, lane.laneId, false));
+        }
         await dispatch({
             type: "LANE_ADDED",
             lane,
@@ -92,17 +96,32 @@ export const updateLane = (lane, items, user, them=false) => async (dispatch, ge
         }
     }
 
-    await dispatch({
-        type: "audio/updateLane",
-        lane,
-    });
-
     dispatch({
         type: "LANE_UPDATED",
         lane,
     });
 
-    if (!getState().conducting) {
+    //if (!getState().conducting) {
+    //    dispatch(singerState(getState()));
+    //}
+};
+
+export const targetLane = (userId, laneId, them) => async (dispatch, getState) => {
+
+    if (them) {
+        dispatch({
+            type: "ws/call",
+            fn: "setTargetLane",
+            kwargs: { userId, laneId },
+        });
+    }
+
+    if (userId === getState().user?.userId) {
+        dispatch({
+            type: "SET_TARGET_LANE",
+            laneId,
+        });
+
         dispatch(singerState(getState()));
     }
 };
@@ -126,9 +145,9 @@ export const updateItem = (item, them=false) => async (dispatch, getState) => {
         item,
     });
 
-    if (!getState().conducting) {
-        dispatch(singerState(getState()));
-    }
+    //if (!getState().conducting) {
+    //    dispatch(singerState(getState()));
+    //}
 };
 
 export const play = (startTime, me=true, them=false) => async (dispatch, getState) => {
@@ -150,9 +169,9 @@ export const play = (startTime, me=true, them=false) => async (dispatch, getStat
             type: "PLAYBACK_STARTED",
         });
 
-        if (!getState().conducting) {
+        //if (!getState().conducting) {
             dispatch(singerState(getState()));
-        }
+        //}
     }
 };
 
@@ -171,11 +190,13 @@ export const stop = (me=true, them=false) => async (dispatch, getState) => {
         dispatch({
             type: "STOPPED",
         });
-        if (!getState().conducting) {
+        //if (!getState().conducting) {
             dispatch(singerState(getState()));
-        }
+        //}
     }
-    await dispatch(rtcUnmute());
+    setTimeout(() => {
+        dispatch(rtcUnmute());
+    },500);
 
 };
 
@@ -207,9 +228,9 @@ export const startRecording = (me=true, them=false) => async (dispatch, getState
             type: "RECORDING_STARTED",
         });
 
-        if (!getState().conducting) {
+        //if (!getState().conducting) {
             dispatch(singerState(getState()));
-        }
+        //}
     }
 };
 
@@ -232,9 +253,9 @@ export const stopRecording = (me=true, them=false) => async (dispatch, getState)
             type: "RECORDING_STOPPED",
         });
 
-        if (!getState().conducting) {
+        //if (!getState().conducting) {
             dispatch(singerState(getState()));
-        }
+        //}
     }
 };
 
@@ -329,9 +350,9 @@ export const seek = (time, me=true, them=false) => async (dispatch, getState) =>
             time: time || 0,
         });
 
-        if (!getState().conducting) {
+        //if (!getState().conducting) {
             dispatch(singerState(getState()));
-        }
+        //}
     }
 
 };

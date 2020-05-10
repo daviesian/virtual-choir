@@ -57,6 +57,7 @@ export const saveRoom = async({roomId, name, currentProjectId, rehearsalState}) 
 export const addProject = async (projectId, roomId, name) => {
     await db.run(SQL`INSERT INTO projects (projectId, roomId, name)
                      VALUES (${projectId}, ${roomId}, ${name})`);
+    return await getProject(projectId);
 }
 
 export const listProjects = async (roomId) => {

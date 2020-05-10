@@ -15,7 +15,7 @@ import {
     listUsers,
     deleteItem,
     listItemsByLane,
-    deleteLane, saveLane, saveItem, getUser
+    deleteLane, saveLane, saveItem, getUser, addProject
 } from "./data";
 
 let video = require("../../build/Release/video.node");
@@ -196,6 +196,8 @@ let messageHandlers = {
                 name: client.room.name,
                 currentProjectId: client.room.currentProjectId,
                 rehearsalState: client.room.rehearsalState,
+                conductorUserId: client.room.conductor?.user.userId,
+                projects: await listProjects(roomId),
             };
         }
     },
@@ -237,6 +239,7 @@ let messageHandlers = {
             let conductorVideo = client.peer?.getTransceiver(RTCTransceivers.MY_VIDEO).receiver.track
             let conductorAudio = client.peer?.getTransceiver(RTCTransceivers.MY_AUDIO).receiver.track
             for(let c of client.room.singers) {
+                client.sendJSON({cmd: "updateRoomConductor", conductorUserId: client.room.conductor?.user.userId})
                 client.sendJSON({cmd: "updateSingerState", user: c.user, state: c.singerState});
                 if (conductorVideo && c.peer) {
                     await c.peer.getTransceiver(RTCTransceivers.CONDUCTOR_VIDEO).sender.replaceTrack(conductorVideo);
@@ -255,14 +258,26 @@ let messageHandlers = {
     listProjects: async (client) => {
         return await listProjects(client.room.roomId);
     },
-    loadProject: async (client, {projectId, conduct}) => {
+    createProject: async (client, {name}) => {
+        requireConductor(client);
+        let project = await addProject(uuid(), client.room.roomId, name);
+        let lanes = await listLanes(project.projectId);
+        let items = await listItemsByProject(project.projectId);
+        let users = await listUsers(project.projectId);
+        client.room.currentProjectId = project.projectId;
+        await saveRoom(client.room);
+        conduct(client.room, {cmd: "loadProject", project, lanes, items, users});
+        return {project, lanes, items, users};
+    },
+    loadProject: async (client, {projectId}) => {
         let project = await getProject(projectId);
         let lanes = await listLanes(projectId);
         let items = await listItemsByProject(projectId);
         let users = await listUsers(projectId);
-        if (client.conducting && conduct) {
+        if (client.conducting) {
             roomLog(client.room, `Loading project ${projectId}`);
-            await saveRoom({...client.room, currentProjectId: projectId});
+            client.room.currentProjectId = projectId;
+            await saveRoom(client.room);
             conduct(client.room, {cmd: "loadProject", project, lanes, items, users});
         }
         return {project, lanes, items, users};
@@ -294,7 +309,23 @@ let messageHandlers = {
     },
     singerStateUpdate: (client, {state}) => {
         client.singerState = state;
-        client.room.conductor?.sendJSON({cmd: "updateSingerState", user: client.user, state});
+        for (let c of client.room.clients) {
+            c.sendJSON({cmd: "updateSingerState", user: client.user, state});
+        }
+    },
+    uploadItem: async (client, { name }, data) => {
+        clientLog(client, "New upload:", name, data.length, "bytes");
+        let itemId = uuid();
+        fs.mkdirSync(".items", {recursive: true});
+        fs.writeFileSync(`.items/${itemId}.${name}`, data);
+        let laneIdx = (await listLanes(client.room.currentProjectId)).length;
+        let lane = await addLane(uuid(), client.room.currentProjectId, client.user.userId, name, laneIdx, true);
+        let itemIdx = (await listItemsByProject(client.room.currentProjectId)).filter(i => i.laneId === lane.laneId).length;
+        let item = await addItem(itemId, lane.laneId, 0, 0, 0, itemIdx, `/.items/${itemId}.${name}`, null);
+
+        for (let c of client.room.clients) {
+            c.sendJSON({cmd: "newItem", item, lane, user: client.user});
+        }
     },
     newItem: async (client, { itemId, laneId, videoBytes, backingTrackId, referenceOutputStartTime }, data) => {
         requireUuid(itemId);
@@ -332,7 +363,9 @@ let messageHandlers = {
         let itemIdx = (await listItemsByProject(client.room.currentProjectId)).filter(i => i.laneId === lane.laneId).length;
         let item = await addItem(itemId, laneId, referenceOutputStartTime+offset, 0, 0, itemIdx, `/.items/${itemId}.aud`, `/.items/${itemId}.vid`);
 
-        client.room.conductor?.sendJSON({cmd: "newItem", item, lane, user: client.user});
+        for (let c of client.room.clients) {
+            c.sendJSON({cmd: "newItem", item, lane, user: client.user});
+        }
     },
     deleteItem: async (client, {itemId}) => {
         requireConductor(client);
@@ -359,17 +392,21 @@ let messageHandlers = {
         let user = await getUser(lane.userId);
         conduct(client.room, {cmd: "updateLane", lane, items, user});
     },
+    setTargetLane: async (client, {userId, laneId}) => {
+        requireConductor(client);
+        if (userId !== client.user.userId) {
+            for(let c of client.room.clients) {
+                if (c.user.userId === userId) {
+                    c.sendJSON({cmd: "setTargetLane", userId, laneId});
+                }
+            }
+        }
+    },
     updateItem: async (client, {item}) => {
         requireConductor(client); // TODO: Or owner of item.
         await saveItem(item);
         conduct(client.room, {cmd: "updateItem", item});
     },
-    // updateLayer: async (client, {layer}) => {
-    //     requireConductor(client);
-    //     // TODO: Update more than just 'enabled'
-    //     let updatedLayer = await updateLayer(layer);
-    //     conduct(client.room, {cmd: "updateLayer", layer: updatedLayer});
-    // },
     setRehearsalState: async (client, {roomId, rehearsalState}) => {
         requireConductor(client);
         client.room.rehearsalState = rehearsalState;

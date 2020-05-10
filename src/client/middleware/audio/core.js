@@ -125,12 +125,12 @@ export const init = async (inputId, outputId, dispatch) => {
         return;
     }
 
-    s.audioOut = new Audio();
-    await s.audioOut.setSinkId(outputId);
+    //s.audioOut = new Audio();
+    //await s.audioOut.setSinkId(outputId);
     s.context = new AudioContext({sampleRate: SAMPLE_RATE, latencyHint: "playback"});
-    s.sink = /*s.context.destination; //*/s.context.createMediaStreamDestination();
-    s.audioOut.srcObject = s.sink.stream;
-    await s.audioOut.play();
+    s.sink = s.context.destination; //s.context.createMediaStreamDestination();
+    //s.audioOut.srcObject = s.sink.stream;
+    //await s.audioOut.play();
     if (s.context.sampleRate !== SAMPLE_RATE) {
         throw new Error("Could not initialise audio context with correct sample rate.");
     }
