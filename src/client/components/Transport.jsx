@@ -130,7 +130,7 @@ const Transport = ({className, style, transportTime, state, items, project, proj
 
     return <Paper square elevation={0} className={clsx(className, classes.root)} style={style}>
         <div className={classes.project} onClick={() => setProjectMenuOpen(true)}>
-            <Typography ref={projectRef} variant={"h5"}>{project?.name}</Typography>
+            <Typography ref={projectRef} variant={"h5"}>{project ? project?.name : `Choose project...`}</Typography>
         </div>
         <Menu
             id="project-menu"

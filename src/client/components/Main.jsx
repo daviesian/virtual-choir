@@ -29,22 +29,16 @@ import Tracks from "./tracks/Tracks";
 import Fab from "@material-ui/core/Fab";
 import green from "@material-ui/core/colors/green";
 import red from "@material-ui/core/colors/red";
-import {requestSpeak, rtcMute, rtcUnmute} from "../actions/rtcActions";
+import {muteChoir, requestSpeak, rtcMute, rtcUnmute} from "../actions/rtcActions";
+import RecordVoiceOverIcon from '@material-ui/icons/RecordVoiceOver';
 
 const useStyles = makeStyles(theme => ({
-    rootContainer: {
-        display: 'flex',
-        flexDirection: 'column',
+    rootContainer: ({sidebarWidth, myVideoAspectRatio}) => ({
         height: "100%",
-    },
-    appBarOffset: theme.mixins.toolbar,
-    grid: ({sidebarWidth, myVideoAspectRatio}) => ({
-        flexGrow: 1,
-        minHeight: 0,
-        backgroundColor: '#cecece',
         display: 'grid',
         gridTemplateColumns: [[sidebarWidth,sidebarWidth,'auto',sidebarWidth]],
-        gridTemplateRows: [['1fr', 'minmax(min-content,200px)']],
+        gridTemplateRows: [['minmax(min-content,200px)', 'min-content', '1fr', ]],
+        backgroundColor: '#cecece',
     }),
     navButton: {
         margin: [[0, 10]],
@@ -60,47 +54,63 @@ const useStyles = makeStyles(theme => ({
         display: "block",
         margin: [[0, 'auto']],
     },
-    topLeft: {
-        gridColumn: '1 / 2',
-        gridRow: '1 / 2',
-    },
-    topRight: {
-        gridColumn: '2 / 5',
-        gridRow: '1 / 2',
-    },
-    topRow: {
+    appBarRow: {
         gridColumn: '1 / 5',
-        gridRow: '1 / 2',
+        gridRow: '2',
     },
-    bottom: {
-        gridRow: '2 / 3',
+    mainLeft: {
+        gridColumn: '1',
+        gridRow: '3',
     },
-    bottomLeft: {
-        gridColumn: '1 / 2',
-        gridRow: '2 / 3',
-    },
-    bottomRight: {
+    mainRight: {
         gridColumn: '2 / 5',
-        gridRow: '2 / 3',
+        gridRow: '3',
+    },
+    mainRow: {
+        gridColumn: '1 / 5',
+        gridRow: '3',
+    },
+    conductorGridPos: {
+        gridRow: '1',
+    },
+    choirGridPos: {
+        gridColumn: '1',
+        gridRow: '1',
+    },
+    controlsGridPos: {
+        gridColumn: '2 / 5',
+        gridRow: '1',
+    },
+    selfVideoGridPos: {
+        gridColumn: '4',
+        gridRow: '1',
     },
     tracks: {
-        gridColumn: 'span 2',
+        gridColumn: '1 / 3',
     },
     videoContainer: {
         position: 'relative',
+        width: '100%',
+        paddingTop: '67%',
     },
     video: {
         position: 'absolute',
+        top:0, left: 0,
         width: '100%',
         height: '100%',
         display: 'block',
-        objectPosition: 'center'
+        objectPosition: 'center',
+    },
+    mirror: {
+        transform: 'scaleX(-1)',
+        transformOrigin: 'center',
     },
     cover: {
         objectFit: 'cover',
     },
     videoOverlay: {
         position: 'absolute',
+        left: 0, top: 0,
         width: '100%',
         height: '100%',
     },
@@ -109,15 +119,24 @@ const useStyles = makeStyles(theme => ({
         backgroundColor: green[100],
         color: green[900],
     },
+    muteChoir: {
+        float: 'right',
+        margin: theme.spacing(2),
+        backgroundColor: green[100],
+        color: green[900],
+    },
     muted: {
         backgroundColor: red[100],
         color: red[900],
+    },
+    extendedIcon: {
+        marginRight: theme.spacing(1)
     }
 }));
 
 const Grow = () => <div style={{flexGrow: 1}}/>;
 
-const Video = ({stream, className, classes, muted, cover, children, ...props}) => {
+const Video = ({stream, className, classes, muted, cover, children, mirror, ...props}) => {
     let ref = useRef(null);
 
     useEffect(() => {
@@ -127,7 +146,7 @@ const Video = ({stream, className, classes, muted, cover, children, ...props}) =
     }, [ref.current, stream]);
 
     return <div className={clsx(className, classes.videoContainer)} {...props}>
-        <video className={clsx(classes.video, cover && classes.cover)} autoPlay={true} ref={ref} muted={muted}/>
+        <video className={clsx(classes.video, cover && classes.cover, mirror && classes.mirror)} autoPlay={true} ref={ref} muted={muted}/>
         <div className={classes.videoOverlay}>
             {children}
         </div>
@@ -172,13 +191,13 @@ const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, dispatch}
             mainPanel = <div className={clsx(classes.mainPanelVideoHolder, classes.topRight)}><Video className={classes.mainPanelVideo} classes={classes} muted={true} stream={choirVideoStream}/></div>;
             break;
         case 'score':
-            mainPanel = <Paper className={classes.topRight}>Score</Paper>;
+            mainPanel = <Paper className={classes.mainRight}>Score</Paper>;
             break;
         case 'lyrics':
-            mainPanel = <Lyrics className={classes.topRight}/>;
+            mainPanel = <Lyrics className={classes.mainRight}/>;
             break;
         case 'tracks':
-            mainPanel = <Tracks sidebarWidth={sidebarWidth} className={classes.topRow}/>;
+            mainPanel = <Tracks sidebarWidth={sidebarWidth} className={classes.mainRow}/>;
             break;
     }
 
@@ -190,10 +209,31 @@ const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, dispatch}
         }
     });
 
+    let muteChoirClick = useCallback(() => {
+        if (conducting) {
+            dispatch(muteChoir());
+        }
+    });
+
     muted = (conducting && muted) || (!conducting && !speaking);
 
     return <Container className={clsx(classes.rootContainer)} maxWidth={false} disableGutters={true}>
-        <AppBar>
+        {selectedPanel !== 'tracks' && <Sidebar className={classes.topLeft}/>}
+        {mainPanel}
+        <Video className={clsx(classes.conductorGridPos, classes.myVideo, conducting && classes.mirror)} cover={true} classes={classes} style={{gridColumn: '1 / 2'}} stream={conducting ? myVideoStream : conductorVideoStream}/>
+        <Video className={clsx(classes.choirGridPos, classes.myVideo)} cover={true} classes={classes} style={{gridColumn: '2 / 3'}} stream={choirVideoStream}>
+            {speaker && <Fab onClick={muteChoirClick} className={clsx(classes.muteChoir, !speaker && classes.muted)} size={'small'} variant={'extended'}>
+                <MicIcon className={classes.extendedIcon}/>
+                {speaker.name}
+            </Fab>}
+        </Video>
+        <Transport className={classes.controlsGridPos} style={{gridColumn: '3 / 4'}}/>
+        <Video className={clsx(classes.selfVideoGridPos, classes.myVideo)} mirror={true} cover={true} classes={classes} stream={myVideoStream}>
+            <Fab onClick={muteClick} className={clsx(classes.mute, muted && classes.muted)}>
+                {muted ? <MicOffIcon/> : <MicIcon/>}
+            </Fab>
+        </Video>
+        <AppBar className={classes.appBarRow} position={'relative'}>
             <Toolbar>
                 <Typography variant="h6" className={classes.title}>Virtual Choir</Typography>
                 <Grow/>
@@ -204,19 +244,6 @@ const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, dispatch}
                 <Button onClick={() => setSelectedPanel('tracks')} className={classes.navButton} color={'inherit'} startIcon={<ClearAllIcon/>}>Tracks</Button>
             </Toolbar>
         </AppBar>
-        <div className={classes.appBarOffset}/>
-            <div className={classes.grid}>
-                {selectedPanel !== 'tracks' && <Sidebar className={classes.topLeft}/>}
-                {mainPanel}
-                <Video className={clsx(classes.bottom, classes.myVideo)} cover={true} classes={classes} style={{gridColumn: '1 / 2'}} stream={conducting ? myVideoStream : conductorVideoStream}/>
-                <Video className={clsx(classes.bottom, classes.myVideo)} cover={true} classes={classes} style={{gridColumn: '2 / 3'}} stream={choirVideoStream}/>
-                <Transport className={classes.bottom} style={{gridColumn: '3 / 4'}}/>
-                <Video className={clsx(classes.bottom, classes.myVideo)} cover={true} classes={classes} style={{gridColumn: '4 / 5'}} stream={myVideoStream}>
-                    <Fab onClick={muteClick} className={clsx(classes.mute, muted && classes.muted)}>
-                        {muted ? <MicOffIcon/> : <MicIcon/>}
-                    </Fab>
-                </Video>
-            </div>
         <ProfileDialog open={profileOpen} user={user} onClose={() => setProfileOpen(false)}/>
     </Container>;
 }

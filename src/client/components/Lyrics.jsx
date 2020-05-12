@@ -64,5 +64,5 @@ export default connect(state => ({
     conducting: state.conducting,
     transportTime: state.transport?.currentTime,
     rehearsalState: state.rehearsalState,
-    lyrics: state.backingTrack?.lyrics,
+    lyrics: state.lyrics[state.project?.lyricsUrl],
 }))(Lyrics);

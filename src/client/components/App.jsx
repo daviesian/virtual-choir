@@ -46,7 +46,6 @@ let App = ({}) => {
     useEffect(() => {
         if (launchPopup === false) {
             // We have explicitly decided that we're ready for audio. This will happen at most once.
-            console.log("NOWWWWW");
             window.store.dispatch(initDevices());
             window.store.dispatch({
                 type: "ws/connect",

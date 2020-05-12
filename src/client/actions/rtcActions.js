@@ -65,3 +65,10 @@ export const rtcUnmute = () => dispatch => {
         muted: false,
     });
 }
+
+export const muteChoir = () => dispatch => {
+    dispatch({
+        type: "ws/call",
+        fn: 'muteChoir',
+    })
+};

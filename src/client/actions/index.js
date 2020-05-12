@@ -167,6 +167,18 @@ export const projectLoaded = ({project, lanes, items, users}) => async (dispatch
         dispatch(targetLane(myUserId, myTargetLane, false));
     }
 
+    if (project.lyricsUrl) {
+        let lyricsSrt = await (await fetch(project.lyricsUrl.replace(/\.[^.]*$/, ".srt"))).text();
+        let lyrics = parseSRT(lyricsSrt);
+
+        dispatch({
+            type: "LYRICS_LOADED",
+            lyricsUrl: project.lyricsUrl,
+            lyrics,
+        });
+    }
+
+
     dispatch({
         type: "PROJECT_LOADED",
         project,

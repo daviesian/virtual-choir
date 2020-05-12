@@ -35,9 +35,11 @@ let useStyles = makeStyles(theme => ({
         overflowY: 'hidden',
         overflowX: 'hidden',
         position: "relative",
+        display: 'flex',
+        flexDirection: 'column',
     },
     tracks: {
-        height: '100%',
+        flexGrow: 1,
         overflowY: 'auto',
         overflowX: 'hidden',
         backgroundColor: grey[50],
@@ -91,18 +93,21 @@ let useStyles = makeStyles(theme => ({
         borderTop: [["2px solid", blueGrey[300]]],
     },
     fixedBottomRow: {
-        position: "sticky",
-        width: '100%',
-        bottom: 0,
+        //position: "sticky",
+        //width: '100%',
+        //bottom: 0,
+        display: 'flex',
         backgroundColor: grey[200],
     },
-    timeDisplay: {
-        gridColumn: '1 / 2',
+    timeDisplay: ({sidebarWidth}) => ({
+        //gridColumn: '1 / 2',
+        width: sidebarWidth,
         textAlign: 'center',
         paddingTop: theme.spacing(2),
-    },
+    }),
     timeScroll: {
-        gridColumn: '2 / 3',
+        //gridColumn: '2 / 3',
+        flexGrow:1,
         padding: theme.spacing(1),
     },
     cursor: {
@@ -113,7 +118,19 @@ let useStyles = makeStyles(theme => ({
         backgroundColor: theme.palette.primary[500],
         pointerEvents: 'none',
     },
-
+    playbackVideo: {
+        position: 'absolute',
+        height: 'calc(100% - 8px)',
+        top: 4,
+        objectFit: 'fit',
+        objectPosition: 'center',
+        borderRadius: 8,
+        transition: 'opacity 1s',
+        zIndex: 10,
+    },
+    hidden: {
+        opacity: 0,
+    }
 }));
 
 const selectUserLanes = createSelector(state => ({
@@ -201,6 +218,43 @@ let itemContextMenuInitialState = {
     item: null,
 }
 
+const Item = ({classes, lane, item, zoom, itemRightClick, transportTime}) => {
+    let videoRef = useRef(null);
+
+    useEffect(() => {
+        if (videoRef.current) {
+            if (transportTime > item.startTime && transportTime < item.startTime + item.duration) {
+                videoRef.current.currentTime = transportTime - item.startTime;
+                videoRef.current.play();
+            } else {
+                videoRef.current.pause();
+                videoRef.current.currentTime = 0;
+            }
+        }
+    },[transportTime > item.startTime]);
+
+    return <React.Fragment>
+        <Paper className={clsx(classes.item, lane.enabled || classes.disabledItem)}
+               elevation={3}
+               onContextMenu={e => itemRightClick(e, item)}
+               style={{
+                   left: zoom * item.startTime,
+                   width: zoom * item.duration,
+                   backgroundImage: `url(${item.rms})`,
+                   backgroundSize: '100% 100%',
+                   backgroundRepeat: 'no-repeat',
+               }}/>
+        <video className={clsx(classes.playbackVideo, (transportTime > item.startTime && transportTime < item.startTime + item.duration && lane.enabled) || classes.hidden)}
+               ref={videoRef}
+               src={item.videoUrl}
+               autoPlay={true}
+               style={{
+                   right: `calc(100% - ${zoom * transportTime}px)`,
+               }}
+        />
+    </React.Fragment>
+}
+
 
 let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime, conducting}) => {
 
@@ -223,8 +277,10 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
 
     let classes = useStyles({sidebarWidth/*, zoom, endTime, rangeStart: range[0]*/});
 
-    let laneClick = useCallback(e => {
-        dispatch(seek(range[0] + ((e.pageX - sidebarWidth - 8)/zoom), true, conducting))
+    let tracksClick = useCallback(e => {
+        if (e.pageX > sidebarWidth) {
+            dispatch(seek(Math.max(0, range[0] + ((e.pageX - sidebarWidth - 8) / zoom)), true, conducting))
+        }
     });
 
     let slide = v => {
@@ -254,10 +310,8 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
         setItemContextMenu(itemContextMenuInitialState);
     });
 
-
-
     return <Paper square elevation={0} className={clsx(classes.root, className)}>
-        <div className={classes.tracks}>
+        <div className={classes.tracks} onClick={tracksClick}>
             {users.map((user,ui) => {
 
                 return <React.Fragment key={`${ui}`}>
@@ -271,23 +325,13 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
                                 laneIndex={li}/>
                             <div className={clsx(classes.lane, firstUserLane && classes.firstUserLane, lane.enabled || classes.disabledLane)}>
                                 <div className={classes.laneInner}
-                                     onClick={laneClick}
+                                     //onClick={laneClick}
                                      style={{
                                          width: zoom * endTime,
                                          left: -zoom * range[0] + 8,
                                      }}>
-                                    {lane.items.map((item, ii) => <Paper key={ii}
-                                                                         className={clsx(classes.item, lane.enabled || classes.disabledItem)}
-                                                                         elevation={3}
-                                                                         onContextMenu={e => itemRightClick(e, item)}
-                                                                         style={{
-                                                                             left: zoom * item.startTime,
-                                                                             width: zoom * item.duration,
-                                                                             backgroundImage: `url(${item.rms})`,
-                                                                             backgroundSize: '100% 100%',
-                                                                             backgroundRepeat: 'no-repeat',
-                                                                         }}/>)}
-                                </div>
+                                    {lane.items.map((item, ii) => <Item key={ii} classes={classes} lane={lane} item={item} zoom={zoom} itemRightClick={itemRightClick} transportTime={transportTime}/>)}
+                                    </div>
                             </div>
                         </React.Fragment>
                     })}
@@ -297,16 +341,18 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
                     <div className={classes.lane}/></>}
                 </React.Fragment>;
             })}
-            <div className={clsx(classes.fixedBottomRow, classes.timeDisplay)}>
+            {transportTime >= range[0] && transportTime <= range[2] && <div className={classes.cursor} style={{
+                left: `calc(${sidebarWidth+8}px + ${zoom * (transportTime - range[0])}px)`
+            }}/>}
+        </div>
+        <div className={classes.fixedBottomRow}>
+            <div className={clsx(classes.timeDisplay)}>
                 <Typography variant={"h6"} className={classes.timer}>{format(transportTime*1000)}{endTime && ` / ${format(endTime*1000)}`}</Typography>
             </div>
-            <div className={clsx(classes.fixedBottomRow, classes.timeScroll)}>
+            <div className={clsx(classes.timeScroll)}>
                 {endTime && <Slider ref={timeSlider} value={range} max={endTime} onChange={(e,v) => slide(v)}/>}
             </div>
         </div>
-        {transportTime >= range[0] && transportTime <= range[2] && <div className={classes.cursor} style={{
-            left: `calc(${sidebarWidth+8}px + ${zoom * (transportTime - range[0])}px)`
-        }}/>}
         <Menu
             keepMounted
             open={itemContextMenu.mouseY !== null}

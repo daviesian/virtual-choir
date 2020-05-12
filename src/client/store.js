@@ -34,6 +34,7 @@ const initialState = {
     lanes: {},
     room: null,
     muted: true,
+    lyrics: {},
 };
 
 let rootReducer = produce((state, action) => {
@@ -60,6 +61,11 @@ let rootReducer = produce((state, action) => {
 
         case "CONDUCTOR_UPDATED":
             state.room.conductorUserId = action.conductorUserId;
+            for (let [uid, user] of Object.entries(state.users)) {
+                if (uid === action.conductorUserId) {
+                    user.online = true;
+                }
+            }
             break;
 
         case "JOINED_ROOM":
@@ -135,6 +141,10 @@ let rootReducer = produce((state, action) => {
                     }
                 }
             }
+            break;
+
+        case "LYRICS_LOADED":
+            state.lyrics[action.lyricsUrl] = action.lyrics;
             break;
 
         case "LANE_ADDED":
@@ -215,6 +225,9 @@ let rootReducer = produce((state, action) => {
             if (action.userId in state.users) {
                 state.users[action.userId].online = false;
             }
+            if (state.room && state.room.conductorUserId === action.userId) {
+                state.room.conductorUserId = null;
+            }
             break;
 
         case "SINGER_JOINED":
@@ -241,6 +254,10 @@ let rootReducer = produce((state, action) => {
 
         case "NOW_SPEAKING":
             state.speaker = action.user;
+
+            if(state.speaker?.userId !== state.user.userId) {
+                state.speaking = false;
+            }
             break;
 
         case "SET_MUTED":

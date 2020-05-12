@@ -145,7 +145,7 @@ export default store => next => {
                 case "deleteItem":
                     if (s.items[action.itemId]) {
                         if (s.items[action.itemId].sourceNode) {
-                            s.items[aciton.itemId].sourceNode.disconnect();
+                            s.items[action.itemId].sourceNode.disconnect();
                         }
                         delete s.items[action.itemId];
                     }

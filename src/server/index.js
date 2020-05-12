@@ -204,9 +204,6 @@ let messageHandlers = {
     leaveRoom: (client) => {
         if (client.room) {
             clientLog(client, `Left room '${client.room.roomId}'`);
-            if (client.room.conductor !== client) {
-                client.room.conductor?.sendJSON({cmd: "singerLeft", userId: client.user.userId});
-            }
             client.room.singers = client.room.singers.filter(s => s !== client);
             if (client.room.conductor === client) {
                 client.room.conductor = null;
@@ -216,6 +213,12 @@ let messageHandlers = {
                 client.room.speaker = null;
                 for (let c of client.room.clients) {
                     c.sendJSON({cmd: "nowSpeaking", user: null});
+                }
+            }
+
+            for (let c of client.room.clients) {
+                if (c !== client) {
+                    c.sendJSON({cmd: "singerLeft", userId: client.user.userId});
                 }
             }
             maybeDestroyRoom(client.room);
@@ -239,7 +242,7 @@ let messageHandlers = {
             let conductorVideo = client.peer?.getTransceiver(RTCTransceivers.MY_VIDEO).receiver.track
             let conductorAudio = client.peer?.getTransceiver(RTCTransceivers.MY_AUDIO).receiver.track
             for(let c of client.room.singers) {
-                client.sendJSON({cmd: "updateRoomConductor", conductorUserId: client.room.conductor?.user.userId})
+                c.sendJSON({cmd: "updateRoomConductor", conductorUserId: client.room.conductor?.user.userId})
                 client.sendJSON({cmd: "updateSingerState", user: c.user, state: c.singerState});
                 if (conductorVideo && c.peer) {
                     await c.peer.getTransceiver(RTCTransceivers.CONDUCTOR_VIDEO).sender.replaceTrack(conductorVideo);
@@ -470,6 +473,12 @@ let messageHandlers = {
         }
 
         await client.peer.getTransceiver(RTCTransceivers.CHOIR_VIDEO).sender.replaceTrack(client.room.video.source.createTrack());
+
+        if (client?.room.speaker) {
+            await client.peer.getTransceiver(RTCTransceivers.SPEAKER_VIDEO).sender.replaceTrack(client.room.speaker.peer.getTransceiver(RTCTransceivers.MY_VIDEO).receiver.track);
+            await client.peer.getTransceiver(RTCTransceivers.SPEAKER_AUDIO).sender.replaceTrack(client.room.speaker !== client ? client.room.speaker.peer.getTransceiver(RTCTransceivers.MY_AUDIO).receiver.track : null);
+            client.sendJSON({cmd: "nowSpeaking", user: client.room.speaker.user});
+        }
     },
     rtcSignal: async (client, {data}) => {
         if (client.peer) {
@@ -495,6 +504,19 @@ let messageHandlers = {
             return wantsToSpeak;
         }
         return false;
+    },
+    muteChoir: async (client) => {
+        requireConductor(client);
+        if (client.room) {
+            client.room.speaker = null;
+            for (let c of client.room.clients) {
+                if (c.peer) {
+                    await c.peer.getTransceiver(RTCTransceivers.SPEAKER_VIDEO).sender.replaceTrack(null);
+                    await c.peer.getTransceiver(RTCTransceivers.SPEAKER_AUDIO).sender.replaceTrack(null);
+                    c.sendJSON({cmd: "nowSpeaking", user: null});
+                }
+            }
+        }
     },
 };
 

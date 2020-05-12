@@ -16,7 +16,7 @@ export const openDB = async () => {
 
     await db.exec("CREATE TABLE IF NOT EXISTS users (userId, name, voice)");
     await db.exec("CREATE TABLE IF NOT EXISTS rooms (roomId, name, currentProjectId, rehearsalState)");
-    await db.exec("CREATE TABLE IF NOT EXISTS projects (projectId, roomId, name)");
+    await db.exec("CREATE TABLE IF NOT EXISTS projects (projectId, roomId, name, lyricsUrl)");
     await db.exec("CREATE TABLE IF NOT EXISTS lanes (laneId, projectId, userId, name, enabled)")
     await db.exec("CREATE TABLE IF NOT EXISTS items (itemId, laneId, startTime, startOffset, endOffset, idx, audioUrl, videoUrl)");
 }
@@ -54,9 +54,9 @@ export const saveRoom = async({roomId, name, currentProjectId, rehearsalState}) 
 }
 
 
-export const addProject = async (projectId, roomId, name) => {
-    await db.run(SQL`INSERT INTO projects (projectId, roomId, name)
-                     VALUES (${projectId}, ${roomId}, ${name})`);
+export const addProject = async (projectId, roomId, name, lyricsUrl) => {
+    await db.run(SQL`INSERT INTO projects (projectId, roomId, name, lyricsUrl)
+                     VALUES (${projectId}, ${roomId}, ${name}, ${lyricsUrl})`);
     return await getProject(projectId);
 }
 
@@ -68,8 +68,8 @@ export const getProject = async (projectId) => {
     return await db.get(SQL`SELECT * FROM projects WHERE projectId=${projectId}`);
 }
 
-export const saveProject = async ({projectId, name}) => {
-    await db.run(SQL`UPDATE projects SET name=${name} WHERE projectId = ${projectId}`);
+export const saveProject = async ({projectId, name, lyricsUrl}) => {
+    await db.run(SQL`UPDATE projects SET name=${name}, lyricsUrl=${lyricsUrl} WHERE projectId = ${projectId}`);
 }
 
 export const deleteProject = async (projectId) => {
