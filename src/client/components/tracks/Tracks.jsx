@@ -28,6 +28,8 @@ import PlayArrowIcon from "@material-ui/icons/PlayArrow";
 import PauseIcon from "@material-ui/icons/Pause";
 import {green, red} from "@material-ui/core/colors";
 import LaneHeader from "./LaneHeader";
+import {setRehearsalState} from "../../actions";
+import {confirm} from "../../util";
 
 let useStyles = makeStyles(theme => ({
     root: {
@@ -103,7 +105,7 @@ let useStyles = makeStyles(theme => ({
         //gridColumn: '1 / 2',
         width: sidebarWidth,
         textAlign: 'center',
-        paddingTop: theme.spacing(2),
+        paddingTop: theme.spacing(1),
     }),
     timeScroll: {
         //gridColumn: '2 / 3',
@@ -255,17 +257,21 @@ const Item = ({classes, lane, item, zoom, itemRightClick, transportTime}) => {
     </React.Fragment>
 }
 
+let lastRange = null; // Ewww
 
-let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime, conducting}) => {
+let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime, conducting, rehearsalState}) => {
 
     let [itemContextMenu, setItemContextMenu] = useState(itemContextMenuInitialState);
 
     let [zoom, setZoom] = useState(10) // Pixels per second
-    let [range, setRange] = useState([0, 0, 0]);
+    let [range, setRange] = useState(rehearsalState?.tracksZoomRange || [0, 0, 0]);
+    lastRange = range;
     let timeSlider = useRef(null);
 
     useEffect(() => {
-        setRange([range[0], endTime / 2, endTime]);
+        if (!rehearsalState?.tracksZoomRange) {
+            setRange([range[0], endTime / 2, endTime]);
+        }
     }, [endTime]);
 
     useEffect(() => {
@@ -275,6 +281,12 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
         }
     }, [endTime, range, timeSlider.current]);
 
+    useEffect(() => {
+        if (rehearsalState?.tracksZoomRange) {
+            setRange(rehearsalState.tracksZoomRange.slice());
+        }
+    }, [rehearsalState?.tracksZoomRange]);
+
     let classes = useStyles({sidebarWidth/*, zoom, endTime, rangeStart: range[0]*/});
 
     let tracksClick = useCallback(e => {
@@ -283,7 +295,15 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
         }
     });
 
+
+    let slideIdleTimeout = useRef(null);
     let slide = v => {
+        clearTimeout(slideIdleTimeout.current);
+        if (conducting) {
+            slideIdleTimeout.current = setTimeout(() => {
+                dispatch(setRehearsalState({...rehearsalState, tracksZoomRange: lastRange}, true));
+            }, 500);
+        }
 
         if (v[1] !== range[1]) {
             // Adjust position
@@ -364,7 +384,7 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
                     : undefined
             }
         >
-            <MenuItem onClick={() => {closeItemContextMenu(); dispatch(deleteItem(itemContextMenu.item.itemId, conducting))}}>Delete Item</MenuItem>
+            <MenuItem onClick={async () => {closeItemContextMenu(); (await confirm(dispatch, 'Are you sure you want to delete this item?', 'Delete Item?')) && dispatch(deleteItem(itemContextMenu.item.itemId, conducting))}}>Delete Item</MenuItem>
         </Menu>
     </Paper>
 }
@@ -374,4 +394,5 @@ export default connect(state => ({
     endTime: selectEndTime(state),
     transportTime: state.transport.currentTime,
     conducting: state.conducting,
+    rehearsalState: state.rehearsalState,
 }))(Tracks);

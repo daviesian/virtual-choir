@@ -31,6 +31,10 @@ import green from "@material-ui/core/colors/green";
 import red from "@material-ui/core/colors/red";
 import {muteChoir, requestSpeak, rtcMute, rtcUnmute} from "../actions/rtcActions";
 import RecordVoiceOverIcon from '@material-ui/icons/RecordVoiceOver';
+import Backdrop from "@material-ui/core/Backdrop";
+import CircularProgress from "@material-ui/core/CircularProgress";
+import {setRehearsalState} from "../actions";
+import Modal from "./Modal";
 
 const useStyles = makeStyles(theme => ({
     rootContainer: ({sidebarWidth, myVideoAspectRatio}) => ({
@@ -131,6 +135,11 @@ const useStyles = makeStyles(theme => ({
     },
     extendedIcon: {
         marginRight: theme.spacing(1)
+    },
+    backdrop: {
+        zIndex: 9999,
+        color: "white",
+        flexDirection: 'column',
     }
 }));
 
@@ -153,15 +162,28 @@ const Video = ({stream, className, classes, muted, cover, children, mirror, ...p
     </div>;
 };
 
-const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, dispatch}) => {
+const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, lyrics, score, loading, loadingMessage, loadingProgress, rehearsalState, modals, dispatch}) => {
     const sidebarWidth = 300;
 
     let classes = useStyles({
         sidebarWidth,
     });
 
-    let [selectedPanel, setSelectedPanel] = useState('tracks');
+    let [selectedPanel, setSelectedPanel] = useState(rehearsalState?.mainPanel || 'tracks');
     let [profileOpen, setProfileOpen] = useState(false);
+
+    let choosePanel = useCallback(panel => {
+        setSelectedPanel(panel);
+        if (conducting) {
+            dispatch(setRehearsalState({...rehearsalState, mainPanel: panel}, true));
+        }
+    });
+
+    useEffect(() => {
+        if(rehearsalState?.mainPanel && selectedPanel !== rehearsalState?.mainPanel) {
+            setSelectedPanel(rehearsalState.mainPanel);
+        }
+    }, [rehearsalState.mainPanel]);
 
     useEffect(() => {
         if (user && !user?.name) {
@@ -237,14 +259,19 @@ const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, dispatch}
             <Toolbar>
                 <Typography variant="h6" className={classes.title}>Virtual Choir</Typography>
                 <Grow/>
-                {!conducting && <Button onClick={() => setSelectedPanel('conductor')} className={classes.navButton} color={'inherit'} startIcon={<EmojiPeopleIcon/>}>Conductor</Button>}
-                <Button onClick={() => setSelectedPanel('choir')} className={classes.navButton} color={'inherit'} startIcon={<SupervisorAccountIcon/>}>Choir</Button>
-                <Button onClick={() => setSelectedPanel('score')} className={classes.navButton} color={'inherit'} startIcon={<MusicNoteIcon/>}>Score</Button>
-                <Button onClick={() => setSelectedPanel('lyrics')} className={classes.navButton} color={'inherit'} startIcon={<QueueMusicIcon/>}>Lyrics</Button>
-                <Button onClick={() => setSelectedPanel('tracks')} className={classes.navButton} color={'inherit'} startIcon={<ClearAllIcon/>}>Tracks</Button>
+                {!conducting && <Button onClick={() => choosePanel('conductor')} className={classes.navButton} color={'inherit'} startIcon={<EmojiPeopleIcon/>}>Conductor</Button>}
+                <Button onClick={() => choosePanel('choir')} className={classes.navButton} color={'inherit'} startIcon={<SupervisorAccountIcon/>}>Choir</Button>
+                <Button onClick={() => choosePanel('score')} disabled={!score} className={classes.navButton} color={'inherit'} startIcon={<MusicNoteIcon/>}>Score</Button>
+                <Button onClick={() => choosePanel('lyrics')} disabled={!conducting && !lyrics} className={classes.navButton} color={'inherit'} startIcon={<QueueMusicIcon/>}>Lyrics</Button>
+                <Button onClick={() => choosePanel('tracks')} className={classes.navButton} color={'inherit'} startIcon={<ClearAllIcon/>}>Tracks</Button>
             </Toolbar>
         </AppBar>
         <ProfileDialog open={profileOpen} user={user} onClose={() => setProfileOpen(false)}/>
+        {modals.map((m,mi) => <Modal key={mi} spec={m}/>)}
+        <Backdrop className={classes.backdrop} open={loading > 0} timeout={{enter: 1000, exit: 100}}>
+            <CircularProgress color={'inherit'} variant={loadingProgress ? 'determinate' : 'indeterminate'} value={loadingProgress ? (100 * loadingProgress.progress / loadingProgress.maximum) : 0}/>
+            <Typography variant={'caption'} color={'inherit'} style={{marginTop: 8}}>{loadingMessage}</Typography>
+        </Backdrop>
     </Container>;
 }
 
@@ -255,4 +282,11 @@ export default connect(state => ({
     muted: state.muted,
     speaker: state.speaker,
     speaking: state.speaking,
+    lyrics: state.lyrics[state.project?.lyricsUrl],
+    score: state.scores[state.project?.scoreUrl],
+    loading: state.loading,
+    loadingMessage: state.loadingMessage,
+    loadingProgress: state.loadingProgress,
+    rehearsalState: state.rehearsalState,
+    modals: state.modals,
 }))(Main);

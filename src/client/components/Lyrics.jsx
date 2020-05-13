@@ -6,15 +6,29 @@ import ListItemText from "@material-ui/core/ListItemText";
 import {seek} from "../actions/audioActions";
 import {makeStyles} from "@material-ui/core/styles";
 import {useCallback, useEffect, useRef} from "react";
-import {setRehearsalState} from "../actions";
+import {addLyrics, setRehearsalState} from "../actions";
 import PlayArrowIcon from "@material-ui/icons/PlayArrow";
+import AddIcon from "@material-ui/icons/Add";
 import Paper from "@material-ui/core/Paper";
+import Typography from "@material-ui/core/Typography";
+import Fab from "@material-ui/core/Fab";
+import CloudUploadIcon from "@material-ui/icons/CloudUpload";
+import Button from "@material-ui/core/Button";
 
 const useStyles = makeStyles(theme => ({
     lyricsBlock: {
         overflowY: "auto",
         margin: [[0, "auto"]],
         width: "max-content",
+    },
+    addContainer: {
+        height: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    addIcon: {
+        marginRight: theme.spacing(1)
     }
 }));
 
@@ -26,7 +40,7 @@ let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch, clas
 
     let clickLine = useCallback((line, isCurrentLine) => {
         if (isCurrentLine) {
-            dispatch(setRehearsalState({cursor: line.start}, conducting));
+            dispatch(setRehearsalState({...rehearsalState, cursor: line.start}, conducting));
         }
         dispatch(seek(line.start, true, conducting));
 
@@ -53,10 +67,26 @@ let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch, clas
         }
     }, [scrollLine?.id]);
 
+
     return <Paper square elevation={0} style={{minHeight: 0, overflow: 'auto'}} className={className}>
-        <List className={classes.lyricsBlock}>
+        {lyrics ? <List className={classes.lyricsBlock}>
             {lyricLines}
-        </List>
+        </List> : <div className={classes.addContainer}>
+            {conducting
+                ? <>
+                    <input
+                        accept={'.srt'}
+                        style={{ display: 'none' }}
+                        id="file-upload-thing"
+                        type="file"
+                        onChange={e => dispatch(addLyrics(e.target.files[0]))}
+                    />
+                    <label htmlFor="file-upload-thing">
+                        <Fab component='span' color={'default'} variant={'extended'}><AddIcon className={classes.addIcon}/> Add lyrics</Fab>
+                    </label>
+                </>
+                : <Typography variant={'subtitle1'}>No lyrics available</Typography>}
+        </div>}
     </Paper>;
 };
 

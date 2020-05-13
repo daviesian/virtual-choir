@@ -27,3 +27,18 @@ export const getAudioBufferRMSImageURL = async (audioBuffer, imgWidth, imgHeight
 export const pageInteractionRequired = async () => {
     return new AudioContext().state === 'suspended';
 };
+
+export const confirm = async (dispatch, message, title) => {
+    return await dispatch({
+        type: "modal/show",
+        spec: {
+            title,
+            content: message,
+            buttons: [
+                {text: "Yes", color: 'primary', resolveValue: true},
+                {text: "No", color: 'default', resolveValue: false},
+            ],
+            dismissRejectValue: false,
+        }
+    })
+}

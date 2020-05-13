@@ -10,6 +10,7 @@ import {
     stopRecording, targetLane, updateItem, updateLane,
 } from "../../actions/audioActions";
 import {
+    loadLyrics,
     projectLoaded,
     sendProgress,
     setRehearsalState,
@@ -113,6 +114,15 @@ export default store => next => {
             store.dispatch({
                 type: "CONDUCTOR_UPDATED",
                 conductorUserId,
+            });
+        },
+        updateProject: ({project}) => {
+            if (project.lyricsUrl) {
+                store.dispatch(loadLyrics(project.lyricsUrl));
+            }
+            store.dispatch({
+                type: "PROJECT_UPDATED",
+                project,
             });
         }
     };

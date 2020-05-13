@@ -24,6 +24,9 @@ import EmojiPeopleIcon from "@material-ui/icons/EmojiPeople";
 import CloudUploadIcon from '@material-ui/icons/CloudUpload';
 import {useCallback, useEffect, useRef} from "react";
 import {uploadItem} from "../../actions";
+import Button from "@material-ui/core/Button";
+import Toolbar from "@material-ui/core/Toolbar";
+import {confirm} from "../../util";
 
 let useStyles = makeStyles(theme => ({
     laneUser: {
@@ -72,15 +75,6 @@ let LaneHeader = ({className, firstUserLane, lastUserLane, user, lane, laneIndex
 
     let classes = useStyles();
 
-    let uploader = useRef();
-    useEffect(() => {
-        if (uploader.current) {
-            console.log(uploader.current);
-            uploader.current.addEventListener("change", e => {
-                dispatch(uploadItem(e.target.files[0]));
-            });
-        }
-    },[uploader.current]);
     return  <Grid container className={className}>
         <Grid item xs>
             {firstUserLane && <Typography variant={"h6"} className={classes.laneUser}>
@@ -89,11 +83,11 @@ let LaneHeader = ({className, firstUserLane, lastUserLane, user, lane, laneIndex
                 {user.user.name}
                 {conducting && user.user.userId === conductorUserId && <>
                     <input
-                        ref={uploader}
                         accept="audio/*"
                         style={{ display: 'none' }}
                         id="file-upload-thing"
                         type="file"
+                        onChange={e => dispatch(uploadItem(e.target.files[0]))}
                     />
                     <label htmlFor="file-upload-thing">
                         <CloudUploadIcon className={classes.uploadIcon} fontSize={'small'}/>
@@ -107,7 +101,7 @@ let LaneHeader = ({className, firstUserLane, lastUserLane, user, lane, laneIndex
             {lane && <>
                 <Typography className={classes.laneName} variant={"body1"}>{lane.name || `${user.user.name} ${laneIndex+1}`}</Typography>
                 {user.online && lastUserLane && <IconButton size={'small'} onClick={() => dispatch(targetLane(user.user.userId, null, conducting))}><AddIcon/></IconButton>}
-                <IconButton size={'small'} onClick={() => dispatch(deleteLane(lane.laneId, conducting))}><DeleteIcon/></IconButton>
+                <IconButton size={'small'} onClick={async () => (await confirm(dispatch, 'Are you sure you want to delete this lane and all its clips?', 'Delete Lane?')) && dispatch(deleteLane(lane.laneId, conducting))}><DeleteIcon/></IconButton>
                 <IconButton size={'small'} onClick={() => dispatch(updateLane({...lane.originalLane, enabled: !lane.enabled}, null, null, conducting))}>
                     {lane.enabled ? <VolumeUpIcon/> : <VolumeOffIcon/>}
                 </IconButton>

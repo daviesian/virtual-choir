@@ -2,28 +2,49 @@ import {loadSingerLayer, targetLane} from "./audioActions";
 import parseSRT from 'parse-srt'
 import Peer from 'simple-peer';
 
-
 export const toast = (message, level='info') => ({
     type: "TOAST",
     level,
     message,
 });
 
+export const startLoading = (message) => ({
+    type: "START_LOADING",
+    message
+});
+export const updateLoadingMessage = (message) => ({
+    type: "UPDATE_LOADING_MESSAGE",
+    message
+});
+export const updateLoadingProgress = (progress, maximum) => ({
+    type: "UPDATE_LOADING_PROGRESS",
+    progress, maximum,
+});
+export const finishLoading = () => ({
+    type: "FINISH_LOADING",
+});
+
 export const requestJoinRoom = (roomId) => async (dispatch) => {
-    let room = await dispatch({
-        type: "ws/call",
-        fn: "joinRoom",
-        kwargs: { roomId },
-    });
+    dispatch(startLoading('Joining room...'));
+    try {
+        let room = await dispatch({
+            type: "ws/call",
+            fn: "joinRoom",
+            kwargs: { roomId },
+        });
 
-    await dispatch({
-        type: "JOINED_ROOM",
-        room,
-    });
+        await dispatch({
+            type: "JOINED_ROOM",
+            room,
+        });
 
-    log.info(`Joined room '${roomId}':`, room);
-    if (room?.currentProjectId) {
-        await dispatch(loadProject(room.currentProjectId, false));
+        log.info(`Joined room '${roomId}':`, room);
+        if (room?.currentProjectId) {
+            await dispatch(loadProject(room.currentProjectId, false));
+        }
+
+    } finally {
+        dispatch(finishLoading());
     }
 };
 
@@ -118,73 +139,97 @@ export const createProject = name => async dispatch => {
 };
 
 export const loadProject = (projectId, conduct = false) => async dispatch => {
+    dispatch(startLoading());
+    try {
+        let project = await dispatch({
+            type: "ws/call",
+            fn: "loadProject",
+            kwargs: {projectId, conduct},
+        });
 
-    let project = await dispatch({
-        type: "ws/call",
-        fn: "loadProject",
-        kwargs: {projectId, conduct},
-    });
-
-    dispatch(projectLoaded(project));
+        dispatch(projectLoaded(project));
+    } finally {
+        dispatch(finishLoading());
+    }
 }
 
 export const projectLoaded = ({project, lanes, items, users}) => async (dispatch, getState)=> {
-
-    dispatch({
-        type: "CLEAR_PROJECT",
-    });
-    dispatch({
-        type: "audio/clearAll",
-    });
-
-    for (let item of items) {
-        let audioItem = await dispatch({
-            type: "audio/loadItem",
-            item,
+    dispatch(startLoading("Loading project..."));
+    try {
+        dispatch({
+            type: "CLEAR_PROJECT",
         });
-        item.duration = audioItem.duration;
-        item.rms = audioItem.rms;
+        dispatch(setRehearsalState({}));
+
+        // Do this first, even though it isn't finished, so the UI looks quicker.
+        dispatch({
+            type: "PROJECT_LOADED",
+            project,
+            users,
+        });
 
         dispatch({
-            type: "ITEM_ADDED",
-            item,
+            type: "audio/clearAll",
         });
-    }
 
-    let myTargetLane = null;
-    let myUserId = getState().user?.userId;
-    for (let lane of lanes) {
-        dispatch({
-            type: "LANE_ADDED",
-            lane,
-        });
-        if (lane.userId === myUserId) {
-            myTargetLane = lane.laneId;
+        let i = 0;
+        for (let item of items) {
+            dispatch(updateLoadingMessage(`Loading audio clip ${++i} of ${items.length}...`))
+            let audioItem = await dispatch({
+                type: "audio/loadItem",
+                item,
+            });
+            item.duration = audioItem.duration;
+            item.rms = audioItem.rms;
+
+            dispatch({
+                type: "ITEM_ADDED",
+                item,
+            });
         }
-    }
+        dispatch(updateLoadingMessage("Reticulating splines..."))
 
-    if (myTargetLane) {
-        dispatch(targetLane(myUserId, myTargetLane, false));
-    }
+        let myTargetLane = null;
+        let myUserId = getState().user?.userId;
+        for (let lane of lanes) {
+            dispatch({
+                type: "LANE_ADDED",
+                lane,
+            });
+            if (lane.userId === myUserId) {
+                myTargetLane = lane.laneId;
+            }
+        }
 
-    if (project.lyricsUrl) {
-        let lyricsSrt = await (await fetch(project.lyricsUrl.replace(/\.[^.]*$/, ".srt"))).text();
+        if (myTargetLane) {
+            dispatch(targetLane(myUserId, myTargetLane, false));
+        }
+
+        if (project.lyricsUrl) {
+            dispatch(loadLyrics(project.lyricsUrl));
+        }
+
+    } finally {
+        dispatch(finishLoading());
+    }
+};
+
+export const loadLyrics = lyricsUrl => async dispatch => {
+    dispatch(startLoading("Loading lyrics..."));
+    try {
+        let lyricsSrt = await (await fetch(lyricsUrl.replace(/\.[^.]*$/, ".srt"))).text();
         let lyrics = parseSRT(lyricsSrt);
 
         dispatch({
             type: "LYRICS_LOADED",
-            lyricsUrl: project.lyricsUrl,
+            lyricsUrl,
             lyrics,
         });
+    } finally {
+        dispatch(finishLoading());
     }
 
-
-    dispatch({
-        type: "PROJECT_LOADED",
-        project,
-        users,
-    });
-};
+}
 
 export const uploadItem = file => async (dispatch) => {
     let buffer = new Uint8Array(await file.arrayBuffer());
@@ -275,20 +320,6 @@ export const doWebRTC = () => async dispatch => {
 
     peer.on("connect", async () => {
         console.log("CONNECT");
-
-        //let m = await navigator.mediaDevices.getUserMedia({
-        //    video: true,
-        //    audio: false
-        //});
-
-        //window.m = m;
-
-        //debugger;
-
-        //peer.addStream(m);
-
-        //let t = peer._pc.getTransceivers()[2].sender.replaceTrack(m.getVideoTracks()[0]);
-
     });
 
     peer.on("track", (a,b,c) => {
@@ -304,8 +335,22 @@ export const doWebRTC = () => async dispatch => {
         fn: "initPeer"
     });
 
-
-
-
-
 }
+
+export const addLyrics = file => async (dispatch, getState) => {
+    dispatch(startLoading("Uploading lyrics..."));
+    try {
+        await dispatch({
+            type: "ws/call",
+            fn: 'uploadLyrics',
+            kwargs: {
+                projectId: getState().project?.projectId,
+                filename: file.name,
+                srtText: await file.text(),
+            }
+        });
+    } finally {
+        dispatch(finishLoading());
+    }
+}
+

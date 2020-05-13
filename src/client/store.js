@@ -5,6 +5,7 @@ import {createBrowserHistory} from "history";
 import audioMiddleware from './middleware/audio';
 import wsMiddleware from "./middleware/ws";
 import rtcMiddleware from "./middleware/rtc";
+import modalMiddleware from "./middleware/modals";
 import {produce} from "immer";
 
 const loggerMiddleware = createLogger({
@@ -13,6 +14,9 @@ const loggerMiddleware = createLogger({
 });
 
 const initialState = {
+    loading: 0,
+    loadingMessage: null,
+    loadingProgress: null,
     audioInitialised: false,
     backingTrack: null,
     transport: {
@@ -35,6 +39,8 @@ const initialState = {
     room: null,
     muted: true,
     lyrics: {},
+    scores: {},
+    modals: [],
 };
 
 let rootReducer = produce((state, action) => {
@@ -140,6 +146,12 @@ let rootReducer = produce((state, action) => {
                         online: false,
                     }
                 }
+            }
+            break;
+
+        case "PROJECT_UPDATED":
+            if (state.project.projectId === action.project.projectId) {
+                state.project = action.project;
             }
             break;
 
@@ -263,6 +275,41 @@ let rootReducer = produce((state, action) => {
         case "SET_MUTED":
             state.muted = action.muted;
             break;
+
+        case "START_LOADING":
+            state.loading++;
+            state.loadingMessage = action.message;
+            break;
+
+        case "UPDATE_LOADING_MESSAGE":
+            state.loadingMessage = action.message;
+            break;
+
+        case "UPDATE_LOADING_PROGRESS":
+            if (action.progress) {
+                state.loadingProgress = {
+                    progress: action.progress,
+                    maximum: action.maximum,
+                };
+            } else {
+                state.loadingProgress = null;
+            }
+            break;
+
+        case "FINISH_LOADING":
+            state.loading = Math.max(0, state.loading - 1);
+            if (state.loading === 0) {
+                state.loadingMessage = null;
+            }
+            break;
+
+        case "MODAL_PUSH":
+            state.modals.push(action.spec);
+            break;
+
+        case "MODAL_POP":
+            state.modals.pop(action.spec);
+            break;
     }
 }, initialState);
 
@@ -276,6 +323,7 @@ export const store = createStore(
         audioMiddleware,
         wsMiddleware,
         rtcMiddleware,
+        modalMiddleware,
     )
 );
 

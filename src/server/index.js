@@ -15,7 +15,7 @@ import {
     listUsers,
     deleteItem,
     listItemsByLane,
-    deleteLane, saveLane, saveItem, getUser, addProject
+    deleteLane, saveLane, saveItem, getUser, addProject, saveProject
 } from "./data";
 
 let video = require("../../build/Release/video.node");
@@ -518,6 +518,36 @@ let messageHandlers = {
             }
         }
     },
+    uploadLyrics: async (client, {projectId, srtText, filename}) => {
+        requireConductor(client);
+        let path = `.lyrics/${projectId}.${filename}`;
+        fs.mkdirSync(".lyrics", {recursive: true});
+        fs.writeFileSync(path, srtText);
+
+
+        let project = await getProject(projectId);
+        if (project) {
+            project.lyricsUrl = `/${path}`;
+            await saveProject(project);
+
+            for (let c of client.room.clients) {
+                c.sendJSON({cmd: "updateProject", project});
+            }
+        }
+    },
+    removeLyrics: async (client, {projectId}) => {
+        requireConductor(client);
+        let project = await getProject(projectId);
+        // TODO: We should probably delete the lyrics file on disk too.
+        if (project) {
+            project.lyricsUrl = null;
+            await saveProject(project);
+            for (let c of client.room.clients) {
+                c.sendJSON({cmd: "updateProject", project});
+            }
+        }
+
+    }
 };
 
 let incomingBinaryData = {};
@@ -595,7 +625,7 @@ app.ws("/ws", (ws, {query: {userId}}) => {
 
 app.use(express.static("static"));
 app.use(express.static("dist"));
-app.use("/.layers", express.static(".layers"));
+app.use("/.lyrics", express.static(".lyrics"));
 app.use("/.items", express.static(".items"));
 
 app.get(/.*/, (req, res) => res.sendFile(path.resolve(root, "../static/index.html")));

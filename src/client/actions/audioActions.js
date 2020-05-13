@@ -1,4 +1,4 @@
-import {singerState} from "./index";
+import {finishLoading, singerState, startLoading} from "./index";
 import {rtcMute, rtcUnmute} from "./rtcActions";
 
 export const initDevices = (reload=false) => async dispatch => {
@@ -55,26 +55,32 @@ export const stopCalibration = () => async dispatch => {
 export const loadItem = (item, lane, user) => async (dispatch, getState) => {
     // TODO: Make sure the user exists
 
-    if (!(lane.laneId in getState().lanes)) {
-        if (user.userId === getState().user?.userId && !getState().targetLaneId) {
-            // This is my lane, and I don't have a target.
-            await dispatch(targetLane(user.userId, lane.laneId, false));
+    dispatch(startLoading("Loading audio clip..."));
+    try {
+
+        if (!(lane.laneId in getState().lanes)) {
+            if (user.userId === getState().user?.userId && !getState().targetLaneId) {
+                // This is my lane, and I don't have a target.
+                await dispatch(targetLane(user.userId, lane.laneId, false));
+            }
+            await dispatch({
+                type: "LANE_ADDED",
+                lane,
+            });
         }
-        await dispatch({
-            type: "LANE_ADDED",
-            lane,
+
+        let audioItem = await dispatch({
+            type: "audio/loadItem",
+            item,
         });
+
+        await dispatch({
+            type: "ITEM_ADDED",
+            item: {...item, ...audioItem},
+        })
+    } finally {
+        dispatch(finishLoading());
     }
-
-    let audioItem = await dispatch({
-        type: "audio/loadItem",
-        item,
-    });
-
-    await dispatch({
-        type: "ITEM_ADDED",
-        item: { ...item, ...audioItem },
-    })
 };
 
 export const updateLane = (lane, items, user, them=false) => async (dispatch, getState) => {
