@@ -625,6 +625,7 @@ app.ws("/ws", (ws, {query: {userId}}) => {
 
 app.use(express.static("static"));
 app.use(express.static("dist"));
+app.use("/node_modules", express.static("node_modules"));
 app.use("/.lyrics", express.static(".lyrics"));
 app.use("/.items", express.static(".items"));
 

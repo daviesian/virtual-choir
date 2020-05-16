@@ -35,6 +35,7 @@ import Backdrop from "@material-ui/core/Backdrop";
 import CircularProgress from "@material-ui/core/CircularProgress";
 import {setRehearsalState} from "../actions";
 import Modal from "./Modal";
+import Score from "./Score";
 
 const useStyles = makeStyles(theme => ({
     rootContainer: ({sidebarWidth, myVideoAspectRatio}) => ({
@@ -169,7 +170,7 @@ const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, lyrics, s
         sidebarWidth,
     });
 
-    let [selectedPanel, setSelectedPanel] = useState(rehearsalState?.mainPanel || 'tracks');
+    let [selectedPanel, setSelectedPanel] = useState(rehearsalState?.mainPanel || 'score');
     let [profileOpen, setProfileOpen] = useState(false);
 
     let choosePanel = useCallback(panel => {
@@ -207,13 +208,13 @@ const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, lyrics, s
 
     switch(selectedPanel) {
         case 'conductor':
-            mainPanel = <div className={clsx(classes.mainPanelVideoHolder, classes.topRight)}><Video className={classes.mainPanelVideo} classes={classes} muted={true} stream={conductorVideoStream}/></div>;
+            mainPanel = <div className={clsx(classes.mainPanelVideoHolder, classes.mainRight)}><Video className={classes.mainPanelVideo} classes={classes} muted={true} stream={conductorVideoStream}/></div>;
             break;
         case 'choir':
-            mainPanel = <div className={clsx(classes.mainPanelVideoHolder, classes.topRight)}><Video className={classes.mainPanelVideo} classes={classes} muted={true} stream={choirVideoStream}/></div>;
+            mainPanel = <div className={clsx(classes.mainPanelVideoHolder, classes.mainRight)}><Video className={classes.mainPanelVideo} classes={classes} muted={true} stream={choirVideoStream}/></div>;
             break;
         case 'score':
-            mainPanel = <Paper className={classes.mainRight}>Score</Paper>;
+            mainPanel = <Score className={classes.mainRight}>Score</Score>;
             break;
         case 'lyrics':
             mainPanel = <Lyrics className={classes.mainRight}/>;
@@ -261,7 +262,7 @@ const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, lyrics, s
                 <Grow/>
                 {!conducting && <Button onClick={() => choosePanel('conductor')} className={classes.navButton} color={'inherit'} startIcon={<EmojiPeopleIcon/>}>Conductor</Button>}
                 <Button onClick={() => choosePanel('choir')} className={classes.navButton} color={'inherit'} startIcon={<SupervisorAccountIcon/>}>Choir</Button>
-                <Button onClick={() => choosePanel('score')} disabled={!score} className={classes.navButton} color={'inherit'} startIcon={<MusicNoteIcon/>}>Score</Button>
+                <Button onClick={() => choosePanel('score')} disabled={false} className={classes.navButton} color={'inherit'} startIcon={<MusicNoteIcon/>}>Score</Button>
                 <Button onClick={() => choosePanel('lyrics')} disabled={!conducting && !lyrics} className={classes.navButton} color={'inherit'} startIcon={<QueueMusicIcon/>}>Lyrics</Button>
                 <Button onClick={() => choosePanel('tracks')} className={classes.navButton} color={'inherit'} startIcon={<ClearAllIcon/>}>Tracks</Button>
             </Toolbar>
