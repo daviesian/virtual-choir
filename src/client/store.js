@@ -310,6 +310,10 @@ let rootReducer = produce((state, action) => {
         case "MODAL_POP":
             state.modals.pop(action.spec);
             break;
+
+        case "SCORE_ANNOTATED":
+            state.project.scoreAnnotations = action.annotations;
+            break;
     }
 }, initialState);
 

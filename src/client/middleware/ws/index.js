@@ -117,9 +117,13 @@ export default store => next => {
             });
         },
         updateProject: ({project}) => {
-            if (project.lyricsUrl) {
+            if (project.lyricsUrl !== store.getState().project?.lyricsUrl) {
                 store.dispatch(loadLyrics(project.lyricsUrl));
             }
+            // TODO:
+            // if (project.scoreUrl !== store.getState().project?.scoreUrl) {
+            //     store.dispatch(loadScore(project.scoreUrl));
+            // }
             store.dispatch({
                 type: "PROJECT_UPDATED",
                 project,

@@ -172,6 +172,15 @@ let _deleteItem = async (client, {itemId}) => {
     await deleteItem(itemId);
 }
 
+let _saveAndBroadcastProject = async (client, project) => {
+    await saveProject(project);
+
+    for (let c of client.room.clients) {
+        c.sendJSON({cmd: "updateProject", project});
+    }
+
+}
+
 let messageHandlers = {
     updateUser: async (client, {user}) => {
         if (client.user.userId === user.userId) {
@@ -528,11 +537,7 @@ let messageHandlers = {
         let project = await getProject(projectId);
         if (project) {
             project.lyricsUrl = `/${path}`;
-            await saveProject(project);
-
-            for (let c of client.room.clients) {
-                c.sendJSON({cmd: "updateProject", project});
-            }
+            await _saveAndBroadcastProject(client, project);
         }
     },
     removeLyrics: async (client, {projectId}) => {
@@ -541,13 +546,40 @@ let messageHandlers = {
         // TODO: We should probably delete the lyrics file on disk too.
         if (project) {
             project.lyricsUrl = null;
-            await saveProject(project);
-            for (let c of client.room.clients) {
-                c.sendJSON({cmd: "updateProject", project});
-            }
+            await _saveAndBroadcastProject(client, project);
         }
 
-    }
+    },
+    uploadScore: async (client, {projectId, filename}, pdfData) => {
+        requireConductor(client);
+        let path = `.scores/${uuid()}.${filename}`;
+        fs.mkdirSync(".scores", { recursive: true });
+        fs.writeFileSync(path, pdfData);
+
+        let project = await getProject(projectId);
+        if (project) {
+            project.scoreUrl = `/${path}`;
+            await _saveAndBroadcastProject(client, project);
+        }
+    },
+    removeScore: async (client, {projectId}) => {
+        requireConductor(client);
+        let project = await getProject(projectId);
+        // TODO: Also delete the PDF on disk.
+        if (project) {
+            project.scoreUrl = null;
+            project.scoreAnnotations = null;
+            await _saveAndBroadcastProject(client, project);
+        }
+    },
+    annotateScore: async (client, {projectId, annotations}) => {
+        requireConductor(client);
+        let project = await getProject(projectId);
+        if (project) {
+            project.scoreAnnotations = annotations;
+            await _saveAndBroadcastProject(client, project);
+        }
+    },
 };
 
 let incomingBinaryData = {};

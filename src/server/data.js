@@ -16,7 +16,7 @@ export const openDB = async () => {
 
     await db.exec("CREATE TABLE IF NOT EXISTS users (userId, name, voice)");
     await db.exec("CREATE TABLE IF NOT EXISTS rooms (roomId, name, currentProjectId, rehearsalState)");
-    await db.exec("CREATE TABLE IF NOT EXISTS projects (projectId, roomId, name, lyricsUrl)");
+    await db.exec("CREATE TABLE IF NOT EXISTS projects (projectId, roomId, name, lyricsUrl, scoreUrl, scoreAnnotations)");
     await db.exec("CREATE TABLE IF NOT EXISTS lanes (laneId, projectId, userId, name, enabled)")
     await db.exec("CREATE TABLE IF NOT EXISTS items (itemId, laneId, startTime, startOffset, endOffset, idx, audioUrl, videoUrl)");
 }
@@ -54,22 +54,32 @@ export const saveRoom = async({roomId, name, currentProjectId, rehearsalState}) 
 }
 
 
-export const addProject = async (projectId, roomId, name, lyricsUrl) => {
-    await db.run(SQL`INSERT INTO projects (projectId, roomId, name, lyricsUrl)
-                     VALUES (${projectId}, ${roomId}, ${name}, ${lyricsUrl})`);
+export const addProject = async (projectId, roomId, name, lyricsUrl, scoreUrl, scoreAnnotations) => {
+    await db.run(SQL`INSERT INTO projects (projectId, roomId, name, lyricsUrl, scoreUrl, scoreAnnotations)
+                     VALUES (${projectId}, ${roomId}, ${name}, ${lyricsUrl}, ${scoreUrl}, ${scoreAnnotations})`);
     return await getProject(projectId);
 }
 
 export const listProjects = async (roomId) => {
-    return await db.all(SQL`SELECT * FROM projects WHERE roomId=${roomId}`);
+    let projects = await db.all(SQL`SELECT * FROM projects WHERE roomId=${roomId}`);
+    for (let p of projects || []) {
+        if (p.scoreAnnotations) {
+            p.scoreAnnotations = JSON.parse(p.scoreAnnotations);
+        }
+    }
+    return projects;
 }
 
 export const getProject = async (projectId) => {
-    return await db.get(SQL`SELECT * FROM projects WHERE projectId=${projectId}`);
+    let p = await db.get(SQL`SELECT * FROM projects WHERE projectId=${projectId}`);
+    if (p.scoreAnnotations) {
+        p.scoreAnnotations = JSON.parse(p.scoreAnnotations);
+    }
+    return p;
 }
 
-export const saveProject = async ({projectId, name, lyricsUrl}) => {
-    await db.run(SQL`UPDATE projects SET name=${name}, lyricsUrl=${lyricsUrl} WHERE projectId = ${projectId}`);
+export const saveProject = async ({projectId, name, lyricsUrl, scoreUrl, scoreAnnotations}) => {
+    await db.run(SQL`UPDATE projects SET name=${name}, lyricsUrl=${lyricsUrl}, scoreUrl=${scoreUrl}, scoreAnnotations=${scoreAnnotations ? JSON.stringify(scoreAnnotations) : null} WHERE projectId = ${projectId}`);
 }
 
 export const deleteProject = async (projectId) => {

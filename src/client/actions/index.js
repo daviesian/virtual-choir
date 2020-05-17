@@ -1,6 +1,7 @@
 import {loadSingerLayer, targetLane} from "./audioActions";
 import parseSRT from 'parse-srt'
 import Peer from 'simple-peer';
+import {produce} from "immer";
 
 export const toast = (message, level='info') => ({
     type: "TOAST",
@@ -354,3 +355,93 @@ export const addLyrics = file => async (dispatch, getState) => {
     }
 }
 
+export const addScore = file => async (dispatch, getState) => {
+    dispatch(startLoading("Uploading score..."));
+    try {
+        await dispatch({
+            type: "ws/call",
+            fn: "uploadScore",
+            kwargs: {
+                projectId: getState().project?.projectId,
+                filename: file.name,
+            },
+            data: new Uint8Array(await file.arrayBuffer()),
+        });
+    } finally {
+        dispatch(finishLoading());
+    }
+}
+
+export const annotateScore = annotations => async (dispatch, getState) => {
+    // N.B. Don't wait for this to complete.
+    dispatch({
+        type: "ws/call",
+        fn: "annotateScore",
+        kwargs: {
+            projectId: getState().project?.projectId,
+            annotations,
+        },
+    });
+
+    // This will update our local cache of the project, which will be promptly overwritten by an update from the server
+    dispatch({
+        type: "SCORE_ANNOTATED",
+        annotations,
+    });
+}
+
+export const addScoreTimingKeyframe = (keyframe) => async (dispatch, getState) => {
+
+    let newAnnotations = produce(getState().project?.scoreAnnotations || {}, annotations => {
+        annotations.timing = annotations.timing || {};
+        annotations.timing.keyframes = annotations.timing.keyframes || [];
+        annotations.timing.keyframes.push(keyframe);
+        annotations.timing.keyframes.sort((a,b) => {
+            if (a.time < b.time) {
+                return -1;
+            } else if (a.time === b.time) {
+                return 0;
+            } else {
+                return 1;
+            }
+        });
+    });
+    console.log(newAnnotations.timing.keyframes);
+
+    await dispatch(annotateScore(newAnnotations));
+}
+
+export const addScoreTimingSystem = (system) => async (dispatch, getState) => {
+    let newAnnotations = produce(getState().project?.scoreAnnotations || {}, annotations => {
+        annotations.timing = annotations.timing || {};
+        annotations.timing.systems = annotations.timing.systems || [];
+        annotations.timing.systems.push(system);
+    });
+    await dispatch(annotateScore(newAnnotations));
+}
+
+export const removeScoreKeyframe = kf => async (dispatch, getState) => {
+    await dispatch(annotateScore(produce(getState().project?.scoreAnnotations || {}, annotations => {
+        if (annotations.timing.keyframes) {
+            annotations.timing.keyframes = annotations.timing.keyframes.filter(k => k.x !== kf.x && k.y !== kf.y && k.page !== kf.page);
+        }
+    })));
+}
+
+export const clearScoreAnnotations = () => async (dispatch, getState) => {
+    await dispatch(annotateScore({}));
+}
+export const clearScoreKeyframes = () => async (dispatch, getState) => {
+    await dispatch(annotateScore(produce(getState().project?.scoreAnnotations || {}, annotations => {
+        if (annotations.timing) {
+            delete annotations.timing.keyframes;
+        }
+    })));
+}
+export const clearScoreSystems = () => async (dispatch, getState) => {
+    await dispatch(annotateScore(produce(getState().project?.scoreAnnotations || {}, annotations => {
+        if (annotations.timing) {
+            delete annotations.timing.systems;
+        }
+    })));
+}
