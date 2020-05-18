@@ -423,7 +423,7 @@ export const addScoreTimingSystem = (system) => async (dispatch, getState) => {
 export const removeScoreKeyframe = kf => async (dispatch, getState) => {
     await dispatch(annotateScore(produce(getState().project?.scoreAnnotations || {}, annotations => {
         if (annotations.timing.keyframes) {
-            annotations.timing.keyframes = annotations.timing.keyframes.filter(k => k.x !== kf.x && k.y !== kf.y && k.page !== kf.page);
+            annotations.timing.keyframes = annotations.timing.keyframes.filter(k => k.x !== kf.x || k.y !== kf.y || k.page !== kf.page);
         }
     })));
 }
