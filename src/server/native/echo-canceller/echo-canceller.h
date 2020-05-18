@@ -35,17 +35,19 @@ class EchoCanceller {
 public:
 	EchoCanceller(double sampleRate) : sampleRate(sampleRate) {}
 
-	void cancel(double *speakerSamples, size_t speakerLength, double *micSamples, size_t micLength) {
+	int cancel(float *speakerSamples, size_t speakerLength, float *micSamples, size_t micLength) {
 		auto speaker = numeric::wrap(speakerSamples, speakerLength);
 		auto mic = numeric::wrap(micSamples, micLength);
 
-		linearRemoval(speaker, mic);
+		int offsetSamples = linearRemoval(speaker, mic);
 		// Strength: between 0 and 1
 		energySuppression(speaker, mic, 0.5);
+
+		return offsetSamples;
 	}
 
 	template <typename Array1, typename Array2>
-	void linearRemoval(Array1 &speaker, Array2 &mic) {
+	int linearRemoval(Array1 &speaker, Array2 &mic) {
 		size_t chunkSamples = (int)(sampleRate*impulseMs*0.001);
 		size_t chunkStep = chunkSamples/4;
 
@@ -135,6 +137,8 @@ public:
 				mic[i] = 0;
 			}
 		}
+
+		return shiftSamples;
 	}
 
 	template <typename Array1, typename Array2>
@@ -171,7 +175,7 @@ public:
 				subtractionCross[i] += micEnergy*refEnergy;
 				subtractionEnergy[i] += refEnergy*refEnergy;
 
-				double energyFactor = subtractionCross[i]/subtractionEnergy[i];
+				double energyFactor = subtractionCross[i]/(subtractionEnergy[i]+1e6);
 				double subtractedEnergy = micEnergy - strength*energyFactor*refEnergy;
 				double ampFactor = sqrt(std::max(0.0, subtractedEnergy)/micEnergy);
 				micSpectrum[i] *= ampFactor;

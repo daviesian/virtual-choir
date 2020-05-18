@@ -108,9 +108,9 @@ export const deleteLane = async (laneId) => {
     await db.run(SQL`DELETE FROM lanes WHERE laneId=${laneId}`);
 }
 
-export const addItem = async (itemId, laneId, startTime, startOffset, endOffset, idx, audioUrl, videoUrl) => {
-    await db.run(SQL`INSERT INTO items (itemId, laneId, startTime, startOffset, endOffset, idx, audioUrl, videoUrl)
-                     VALUES (${itemId}, ${laneId}, ${startTime}, ${startOffset}, ${endOffset}, ${idx}, ${audioUrl}, ${videoUrl})`);
+export const addItem = async (itemId, laneId, startTime, startOffset, endOffset, idx, audioUrl, videoUrl, videoOffset) => {
+    await db.run(SQL`INSERT INTO items (itemId, laneId, startTime, startOffset, endOffset, idx, audioUrl, videoUrl, videoOffset)
+                     VALUES (${itemId}, ${laneId}, ${startTime}, ${startOffset}, ${endOffset}, ${idx}, ${audioUrl}, ${videoUrl}, ${videoOffset})`);
     return await getItem(itemId);
 }
 
@@ -126,8 +126,8 @@ export const listItemsByLane = async (laneId) => {
     return await db.all(SQL`SELECT * FROM items WHERE laneId=${laneId}`);
 }
 
-export const saveItem = async ({itemId, laneId, startOffset, endOffset, videoUrl}) => {
-    await db.run(SQL`UPDATE items SET laneId=${laneId}, startOffset=${startOffset}, endOffset=${endOffset}, videoUrl=${videoUrl} WHERE itemId=${itemId}`);
+export const saveItem = async ({itemId, laneId, startOffset, endOffset, videoUrl, videoOffset}) => {
+    await db.run(SQL`UPDATE items SET laneId=${laneId}, startOffset=${startOffset}, endOffset=${endOffset}, videoUrl=${videoUrl}, videoOffset=${videoOffset} WHERE itemId=${itemId}`);
 }
 
 export const deleteItem = async (itemId) => {

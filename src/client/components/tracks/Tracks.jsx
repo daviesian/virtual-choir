@@ -225,15 +225,15 @@ const Item = ({classes, lane, item, zoom, itemRightClick, transportTime}) => {
 
     useEffect(() => {
         if (videoRef.current) {
-            if (transportTime > item.startTime && transportTime < item.startTime + item.duration) {
-                videoRef.current.currentTime = transportTime - item.startTime;
+            if (transportTime > item.startTime + (item.videoOffset || 0) && transportTime < item.startTime + (item.videoOffset || 0) + item.duration) {
+                videoRef.current.currentTime = transportTime - item.startTime + (item.videoOffset || 0);
                 videoRef.current.play();
             } else {
                 videoRef.current.pause();
                 videoRef.current.currentTime = 0;
             }
         }
-    },[transportTime > item.startTime]);
+    },[transportTime > item.startTime + (item.videoOffset || 0)]);
 
     return <React.Fragment>
         <Paper className={clsx(classes.item, lane.enabled || classes.disabledItem)}
@@ -246,7 +246,7 @@ const Item = ({classes, lane, item, zoom, itemRightClick, transportTime}) => {
                    backgroundSize: '100% 100%',
                    backgroundRepeat: 'no-repeat',
                }}/>
-        <video className={clsx(classes.playbackVideo, (transportTime > item.startTime && transportTime < item.startTime + item.duration && lane.enabled) || classes.hidden)}
+        <video className={clsx(classes.playbackVideo, (transportTime > item.startTime + (item.videoOffset || 0) && transportTime < item.startTime + (item.videoOffset || 0) + item.duration && lane.enabled) || classes.hidden)}
                ref={videoRef}
                src={item.videoUrl}
                autoPlay={true}

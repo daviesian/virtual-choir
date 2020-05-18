@@ -21,11 +21,6 @@ import {
 let video = require("../../build/Release/video.node");
 let echoCanceller = require("../../build/Release/echoCanceller.node");
 
-let x = echoCanceller.cancel(50);
-console.log(x)
-
-//process.exit(0)
-
 require("regenerator-runtime");
 const {
     performance
@@ -56,11 +51,27 @@ let align = (itemId) => {
     let referenceBuffer = fs.readFileSync(`.items/${itemId}.reference.aud`);
     let referenceAudio = new Float32Array(referenceBuffer.buffer, 0, referenceBuffer.byteLength / 4);
 
-    return video.align(recordedAudio.buffer, referenceAudio.buffer);
+    let offset = echoCanceller.cancel(referenceAudio.buffer, recordedAudio.buffer);
+
+    fs.writeFileSync(`.items/${itemId}.cancelled.aud`, recordedAudio);
+
+    for(let i = 0; i < 10; i++) {
+        console.log(recordedAudio[i]);
+    }
+    /*new Promise((resolve, reject) => ffmpeg(`.items/${itemId}.cancelled.aud`)
+        .inputFormat("f32le")
+        .output(`.items/${itemId}.cancelled.wav`)
+        .on('error', reject)
+        .on('end', resolve)
+        .run());*/
+
+    return offset;
 }
 
-// console.log(align('75fcaf99-1640-45b7-af9a-4308fc2921f4'));
-// process.exit(0);
+// align('0c651341-baa3-4169-8522-9ee7abdad99a').then(offset => {
+//     console.log(offset);
+//     process.exit(0);
+// })
 
 // Useful background: https://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
 
@@ -339,7 +350,7 @@ let messageHandlers = {
         let laneIdx = (await listLanes(client.room.currentProjectId)).length;
         let lane = await addLane(uuid(), client.room.currentProjectId, client.user.userId, name, laneIdx, true);
         let itemIdx = (await listItemsByProject(client.room.currentProjectId)).filter(i => i.laneId === lane.laneId).length;
-        let item = await addItem(itemId, lane.laneId, 0, 0, 0, itemIdx, `/.items/${itemId}.${name}`, null);
+        let item = await addItem(itemId, lane.laneId, 0, 0, 0, itemIdx, `/.items/${itemId}.${name}`, null, null);
 
         for (let c of client.room.clients) {
             c.sendJSON({cmd: "newItem", item, lane, user: client.user});
@@ -351,6 +362,7 @@ let messageHandlers = {
         fs.mkdirSync(".items", {recursive: true});
         fs.writeFileSync(`.items/${itemId}.original.vid`, data.subarray(0,videoBytes));
         fs.writeFileSync(`.items/${itemId}.reference.aud`, data.subarray(videoBytes));
+
 
         await new Promise((resolve, reject) => ffmpeg(`.items/${itemId}.original.vid`)
             // Extract the recorded audio from the video
@@ -370,7 +382,7 @@ let messageHandlers = {
             .run());
 
         let offset = align(itemId);
-        console.log("Got offset:", offset.toFixed(3), "s");
+
         let lane = await getLane(laneId);
         if (!lane) {
             // No valid lane was provided. Create a new lane for this user.
@@ -379,7 +391,7 @@ let messageHandlers = {
             lane = await addLane(laneId, client.room.currentProjectId, client.user.userId, '', laneIdx, true);
         }
         let itemIdx = (await listItemsByProject(client.room.currentProjectId)).filter(i => i.laneId === lane.laneId).length;
-        let item = await addItem(itemId, laneId, referenceOutputStartTime+offset, 0, 0, itemIdx, `/.items/${itemId}.aud`, `/.items/${itemId}.vid`);
+        let item = await addItem(itemId, laneId, referenceOutputStartTime, 0, 0, itemIdx, `/.items/${itemId}.cancelled.aud`, `/.items/${itemId}.vid`, offset);
 
         for (let c of client.room.clients) {
             c.sendJSON({cmd: "newItem", item, lane, user: client.user});
