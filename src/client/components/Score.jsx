@@ -54,7 +54,7 @@ const useStyles = makeStyles(theme => ({
 }));
 
 
-let Score = ({rehearsalState, conducting, transportTime, annotations, dispatch, className}) => {
+let Score = ({rehearsalState, conducting, transportTime, transportState, annotations, dispatch, className}) => {
     let classes = useStyles();
     let canvas = useRef();
     let overlay = useRef();
@@ -66,6 +66,7 @@ let Score = ({rehearsalState, conducting, transportTime, annotations, dispatch, 
 
     let [canvasUpdate, setCanvasUpdate] = useState(0);
     let pdfRender = useRef(null);
+    let renderTransportTime = useRef(null);
 
     useEffect(() => {(async () => {
         setPdf(await pdfjs.getDocument("/Time After Time.pdf").promise);
@@ -137,11 +138,13 @@ let Score = ({rehearsalState, conducting, transportTime, annotations, dispatch, 
     }
 
     let pdfRectToCanvas = ({x,y,width,height}) => {
-        let {x: w, y: h} = pdfToCanvas({ x: width, y: height });
+        let {x: x1, y: y1} = pdfToCanvas({x,y});
+        let {x: x2, y: y2} = pdfToCanvas({ x: x+width, y: y+height });
         return {
-            ...pdfToCanvas({x,y}),
-            width: w,
-            height: h,
+            x: x1,
+            y: y1,
+            width: x2-x1,
+            height: y2-y1,
         }
     }
 
@@ -353,10 +356,15 @@ let Score = ({rehearsalState, conducting, transportTime, annotations, dispatch, 
 
         let pdfCursor = timeToPdfCursor(transportTime, kfs, sys);
         if (pdfCursor) {
-            setPageNumber(pdfCursor.page);
-            let canvasCursor = pdfRectToCanvas(pdfCursor);
-            ctx.strokeRect(canvasCursor.x, canvasCursor.y, 1, canvasCursor.height);
+            if (transportTime !== renderTransportTime.current) {
+                setPageNumber(pdfCursor.page);
+            }
+            if (pageNumber === pdfCursor.page) {
+                let canvasCursor = pdfRectToCanvas(pdfCursor);
+                ctx.strokeRect(canvasCursor.x, canvasCursor.y, 1, canvasCursor.height);
+            }
         }
+        renderTransportTime.current = transportTime;
 
     }, [canvasUpdate, transportTime, editing, annotations, selectionBoxCorner]);
 
@@ -369,10 +377,6 @@ let Score = ({rehearsalState, conducting, transportTime, annotations, dispatch, 
                 onContextMenu={e => e.preventDefault()}
                 onWheel={canvasScroll}
         />
-        {/*<Paper className={classes.annotationControls}>*/}
-        {/*    <Button variant={'contained'} color={'primary'} onClick={() => dispatch(clearScoreKeyframes())}>Clear Keyframes</Button>*/}
-        {/*    <Button variant={'contained'} color={'primary'} onClick={() => dispatch(clearScoreSystems())}>Clear Systems</Button>*/}
-        {/*</Paper>*/}
     </Paper>;
 };
 
@@ -381,4 +385,5 @@ export default connect(state => ({
     transportTime: state.transport?.currentTime,
     rehearsalState: state.rehearsalState,
     annotations: state.project?.scoreAnnotations,
+    transportState: state.transport?.state,
 }))(Score);
