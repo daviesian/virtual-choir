@@ -1,5 +1,12 @@
-#include "lib/numeric.h"
 
+// M_PI isn't defined on Windows.
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
+
+
+#include "lib/numeric.h"
+#include "lib/fft.h"
 #include <complex>
 
 class EchoCanceller {

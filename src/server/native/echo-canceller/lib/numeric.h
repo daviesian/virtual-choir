@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <memory>
 #include <iterator>
+#include <cassert>
 
 #include <cmath> // for abs/sin/etc.
 
@@ -128,11 +129,11 @@ namespace NUMERIC_NAMESPACE {
 		return a.size()/fixedStride;
 	}
 	template<size_t fixedStride, size_t maxA, size_t divisorA>
-	SizeBounded<maxA/fixedStride, (divisorA/fixedStride*fixedStride == divisorA) ? divisorA/fixedStride : 1> sizeDivide(const SizeBounded<maxA, divisorA> &a) {
+	SizeBounded<maxA/fixedStride, ((divisorA/fixedStride*fixedStride == divisorA) ? divisorA/fixedStride : 1)> sizeDivide(const SizeBounded<maxA, divisorA> &a) {
 		return a.size()/fixedStride;
 	}
 	template<size_t fixedStride, size_t divisorA>
-	SizeFinite<(divisorA/fixedStride*fixedStride == divisorA) ? divisorA/fixedStride : 1> sizeDivide(const SizeFinite<divisorA> &a) {
+	SizeFinite<((divisorA/fixedStride*fixedStride == divisorA) ? divisorA/fixedStride : 1)> sizeDivide(const SizeFinite<divisorA> &a) {
 		return a.size()/fixedStride;
 	}
 
@@ -907,15 +908,15 @@ namespace NUMERIC_NAMESPACE {
 		{ \
 			return NUMERIC_BINARY_MAP_EXPR(explicitFunc, Item, OtherItem, other); \
 		} \
-		/* Optional friend function for left-operator */ \
-		UNPACK_OR_IGNORE( \
-			template<typename LeftItem, typename RightItem, typename RightSize, template<typename,typename> class RightStrategy, typename RightDeferred> \
-			friend auto funcName (const LeftItem &left, const Array<RightItem, RightSize, RightStrategy, RightDeferred> &right) \
-				-> decltype(NUMERIC_BINARY_MAP_LEFTEXPR(flipFunc, right, RightItem, LeftItem, left)) \
-			{ \
-				return NUMERIC_BINARY_MAP_LEFTEXPR(flipFunc, right, RightItem, LeftItem, left); \
-			} \
-		)
+		// /* Optional friend function for left-operator */ \
+		// UNPACK_OR_IGNORE( \
+		// 	template<typename LeftItem, typename RightItem, typename RightSize, template<typename,typename> class RightStrategy, typename RightDeferred> \
+		// 	friend auto funcName (const LeftItem &left, const Array<RightItem, RightSize, RightStrategy, RightDeferred> &right) \
+		// 		-> decltype(NUMERIC_BINARY_MAP_LEFTEXPR(flipFunc, right, RightItem, LeftItem, left)) \
+		// 	{ \
+		// 		return NUMERIC_BINARY_MAP_LEFTEXPR(flipFunc, right, RightItem, LeftItem, left); \
+		// 	} \
+		// )
 #define NUMERIC_BINARY_OP(Suffix, Operator, method, ENABLE_LEFT_FUNCTION) \
 		NUMERIC_BINARY_METHODS(operators::binaryRight##Suffix, operators::binaryLeft##Suffix, method, ENABLE_LEFT_FUNCTION)
 

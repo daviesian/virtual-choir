@@ -19,6 +19,12 @@ import {
 } from "./data";
 
 let video = require("../../build/Release/video.node");
+let echoCanceller = require("../../build/Release/echoCanceller.node");
+
+let x = echoCanceller.cancel(50);
+console.log(x)
+
+//process.exit(0)
 
 require("regenerator-runtime");
 const {

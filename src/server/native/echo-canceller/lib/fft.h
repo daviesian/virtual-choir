@@ -4,7 +4,7 @@
 #include <array>
 
 #ifndef SIGNALSMITH_INLINE
-#define SIGNALSMITH_INLINE __attribute__((always_inline)) inline
+#define SIGNALSMITH_INLINE /*__attribute__((always_inline))*/ inline
 #endif
 
 namespace signalsmith {
