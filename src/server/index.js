@@ -55,9 +55,6 @@ let align = (itemId) => {
 
     fs.writeFileSync(`.items/${itemId}.cancelled.aud`, recordedAudio);
 
-    for(let i = 0; i < 10; i++) {
-        console.log(recordedAudio[i]);
-    }
     /*new Promise((resolve, reject) => ffmpeg(`.items/${itemId}.cancelled.aud`)
         .inputFormat("f32le")
         .output(`.items/${itemId}.cancelled.wav`)
@@ -678,6 +675,7 @@ app.use(express.static("dist"));
 app.use("/node_modules", express.static("node_modules"));
 app.use("/.lyrics", express.static(".lyrics"));
 app.use("/.items", express.static(".items"));
+app.use("/.scores", express.static(".scores"));
 
 app.get(/.*/, (req, res) => res.sendFile(path.resolve(root, "../static/index.html")));
 

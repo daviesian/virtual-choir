@@ -1,29 +1,20 @@
 import * as React from 'react';
 import {connect} from "react-redux";
-import List from "@material-ui/core/List";
-import ListItem from "@material-ui/core/ListItem";
-import ListItemText from "@material-ui/core/ListItemText";
 import {seek} from "../actions/audioActions";
 import {makeStyles} from "@material-ui/core/styles";
-import {useCallback, useEffect, useRef, useState} from "react";
+import { useEffect, useRef, useState} from "react";
 import {
-    addLyrics,
+    addScore,
     addScoreTimingKeyframe,
     addScoreTimingSystem,
-    annotateScore,
-    clearScoreAnnotations, clearScoreKeyframes, clearScoreSystems, removeScoreKeyframe,
-    setRehearsalState
+    removeScoreKeyframe, removeScoreSystem,
 } from "../actions";
-import PlayArrowIcon from "@material-ui/icons/PlayArrow";
-import AddIcon from "@material-ui/icons/Add";
 import Paper from "@material-ui/core/Paper";
-import Typography from "@material-ui/core/Typography";
-import Fab from "@material-ui/core/Fab";
-import CloudUploadIcon from "@material-ui/icons/CloudUpload";
-import Button from "@material-ui/core/Button";
 import clsx from "clsx";
 import pdfjs from "pdfjs-dist";
-import yellow from "@material-ui/core/colors/yellow";
+import Typography from "@material-ui/core/Typography";
+import Fab from "@material-ui/core/Fab";
+import AddIcon from "@material-ui/icons/Add";
 
 pdfjs.GlobalWorkerOptions.workerSrc =
     '/node_modules/pdfjs-dist/build/pdf.worker.js';
@@ -50,11 +41,20 @@ const useStyles = makeStyles(theme => ({
         top: theme.spacing(2),
         right: theme.spacing(2),
         padding: theme.spacing(2),
+    },
+    addContainer: {
+        height: '100%',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    addIcon: {
+        marginRight: theme.spacing(1)
     }
 }));
 
 
-let Score = ({rehearsalState, conducting, transportTime, transportState, annotations, dispatch, className}) => {
+let Score = ({rehearsalState, conducting, transportTime, scoreUrl, annotations, dispatch, ...props}) => {
     let classes = useStyles();
     let canvas = useRef();
     let overlay = useRef();
@@ -69,8 +69,10 @@ let Score = ({rehearsalState, conducting, transportTime, transportState, annotat
     let renderTransportTime = useRef(null);
 
     useEffect(() => {(async () => {
-        setPdf(await pdfjs.getDocument("/Time After Time.pdf").promise);
-    })()},[]);
+        if (scoreUrl) {
+            setPdf(await pdfjs.getDocument(scoreUrl).promise);
+        }
+    })()},[scoreUrl]);
 
     useEffect(() => {(async () => {
         if (!pdf || !pageNumber) {
@@ -127,6 +129,7 @@ let Score = ({rehearsalState, conducting, transportTime, transportState, annotat
         return {
             x: (canvasX - pdfOffset.x)/pdfScale,
             y: (canvasY - pdfOffset.y)/pdfScale,
+            page: pageNumber,
         }
     }
 
@@ -197,38 +200,41 @@ let Score = ({rehearsalState, conducting, transportTime, transportState, annotat
         if (s) {
             let kfStartIndex = keyframes.findIndex(k => k.page === s.page && k.x > s.x && k.y > s.y && k.x < s.x+s.width && k.y < s.y+s.height);
             let kfEndIndex = keyframes.length - 1 - kfsReverse.findIndex(k => k.page === s.page && k.x > s.x && k.y > s.y && k.x < s.x+s.width && k.y < s.y+s.height);
-            if (pdfPoint.x >= keyframes[kfStartIndex].x && pdfPoint.x < keyframes[kfEndIndex].x) {
-                // Within system
-                let prevKf, nextKf;
-                for (let i = kfStartIndex; i <= kfEndIndex; i++) {
-                    if (keyframes[i].x <= pdfPoint.x) {
-                        prevKf = keyframes[i];
+            if (kfStartIndex > -1 && kfEndIndex > -1) {
+
+                if (pdfPoint.x >= keyframes[kfStartIndex].x && pdfPoint.x < keyframes[kfEndIndex].x) {
+                    // Within system
+                    let prevKf, nextKf;
+                    for (let i = kfStartIndex; i <= kfEndIndex; i++) {
+                        if (keyframes[i].x <= pdfPoint.x) {
+                            prevKf = keyframes[i];
+                        }
+                        if (keyframes[i].x > pdfPoint.x) {
+                            nextKf = keyframes[i];
+                            break;
+                        }
                     }
-                    if (keyframes[i].x > pdfPoint.x) {
-                        nextKf = keyframes[i];
-                        break;
-                    }
-                }
-                return prevKf.time + ((pdfPoint.x-prevKf.x)/(nextKf.x-prevKf.x))*(nextKf.time-prevKf.time)
-            } else if (pdfPoint.x < keyframes[kfStartIndex].x) {
-                // Before first kf in system
-                return keyframes[kfStartIndex].time;
-            } else {
-                // After last kf in system
-                if (keyframes.length > kfEndIndex + 1) {
-                    let prevKf = keyframes[kfEndIndex];
-                    let nextKf = keyframes[kfEndIndex+1];
-                    if (pdfPoint.x > s.x+s.width) {
-                        // We're off the end of the system. Jump to start of next.
-                        return nextKf.time;
-                    } else {
-                        // We're still inside this system. Interpolate.
-                        let nextSystem = findRectUnderPointOnPage(nextKf, systems)
-                        return prevKf.time + ((pdfPoint.x-prevKf.x)/(s.x+s.width - prevKf.x + nextKf.x - nextSystem.x)) * (nextKf.time - prevKf.time);
-                    }
+                    return prevKf.time + ((pdfPoint.x-prevKf.x)/(nextKf.x-prevKf.x))*(nextKf.time-prevKf.time)
+                } else if (pdfPoint.x < keyframes[kfStartIndex].x) {
+                    // Before first kf in system
+                    return keyframes[kfStartIndex].time;
                 } else {
-                    // We dont have a next keyframe.
-                    return keyframes[kfEndIndex].time;
+                    // After last kf in system
+                    if (keyframes.length > kfEndIndex + 1) {
+                        let prevKf = keyframes[kfEndIndex];
+                        let nextKf = keyframes[kfEndIndex+1];
+                        if (pdfPoint.x > s.x+s.width) {
+                            // We're off the end of the system. Jump to start of next.
+                            return nextKf.time;
+                        } else {
+                            // We're still inside this system. Interpolate.
+                            let nextSystem = findRectUnderPointOnPage(nextKf, systems)
+                            return prevKf.time + ((pdfPoint.x-prevKf.x)/(s.x+s.width - prevKf.x + nextKf.x - nextSystem.x)) * (nextKf.time - prevKf.time);
+                        }
+                    } else {
+                        // We dont have a next keyframe.
+                        return keyframes[kfEndIndex].time;
+                    }
                 }
             }
         }
@@ -280,6 +286,15 @@ let Score = ({rehearsalState, conducting, transportTime, transportState, annotat
                     dispatch(removeScoreKeyframe(nearbyKeyframe));
                     e.stopPropagation();
                     e.preventDefault();
+                } else {
+                    let sys = annotations?.timing?.systems || [];
+                    let hoverSystem = findRectUnderPointOnPage(pdfPoint, sys);
+                    console.log(sys, pdfPoint, hoverSystem);
+                    if (hoverSystem) {
+                        dispatch(removeScoreSystem(hoverSystem));
+                        e.stopPropagation();
+                        e.preventDefault();
+                    }
                 }
             } else {
                 let clickTime = pdfPointToTime(pdfPoint, annotations?.timing?.keyframes || [], annotations?.timing?.systems || []);
@@ -313,10 +328,19 @@ let Score = ({rehearsalState, conducting, transportTime, transportState, annotat
             setPageNumber(Math.min(pageNumber + 1, pdf.numPages));
         }
         e.stopPropagation();
-        //e.preventDefault(); // TODO: Make this event handler non-passive, then do this to prevent zoom.
+        e.preventDefault(); // TODO: Make this event handler non-passive, then do this to prevent zoom.
     }
 
     useEffect(() => {
+        if (overlay.current) {
+            overlay.current.addEventListener('mousewheel', canvasScroll);
+        }
+    },[overlay.current]);
+
+    useEffect(() => {
+        if (!pdf) {
+            return;
+        }
         let ctx = overlay.current.getContext('2d');
         ctx.clearRect(0,0,9999, 9999);
         ctx.fillStyle='rgba(33, 150, 243,0.1)';
@@ -332,8 +356,8 @@ let Score = ({rehearsalState, conducting, transportTime, transportState, annotat
         let sys = annotations?.timing?.systems || [];
 
         if (editing) {
-            ctx.fillStyle = 'rgba(33, 150, 243,0.05)';
-            ctx.strokeStyle = 'rgba(33, 150, 243, 0.05)';
+            ctx.fillStyle = 'rgba(33, 150, 243,0.1)';
+            ctx.strokeStyle = 'rgba(33, 150, 243, 1)';
             for (let box of sys) {
                 if (box.page === pageNumber) {
                     let a = pdfToCanvas({x: box.x, y: box.y});
@@ -368,15 +392,31 @@ let Score = ({rehearsalState, conducting, transportTime, transportState, annotat
 
     }, [canvasUpdate, transportTime, editing, annotations, selectionBoxCorner]);
 
-    return <Paper square elevation={0} style={{minHeight: 0, overflow: 'auto'}} className={clsx(className,classes.root)}>
-        <canvas ref={canvas} className={classes.scoreCanvas}/>
-        <canvas ref={overlay} className={classes.overlayCanvas}
-                onMouseDown={canvasMouseDown}
-                onMouseMove={canvasMouseMove}
-                onMouseUp={canvasMouseUp}
-                onContextMenu={e => e.preventDefault()}
-                onWheel={canvasScroll}
-        />
+    return <Paper square elevation={0} style={{minHeight: 0, overflow: 'auto'}} className={clsx(props.className,classes.root)}>
+        {pdf ? <>
+            <canvas ref={canvas} className={classes.scoreCanvas}/>
+            <canvas ref={overlay} className={classes.overlayCanvas}
+                    onMouseDown={canvasMouseDown}
+                    onMouseMove={canvasMouseMove}
+                    onMouseUp={canvasMouseUp}
+                    onContextMenu={e => e.preventDefault()}
+                    // onWheel={canvasScroll}
+            />
+        </> : <div className={classes.addContainer}>
+            {scoreUrl ? <Typography variant={'subtitle1'}>Loading score...</Typography> : conducting ? <>
+                <input
+                    accept={'.pdf'}
+                    style={{ display: 'none' }}
+                    id="file-upload-thing"
+                    type="file"
+                    onChange={e => dispatch(addScore(e.target.files[0]))}
+                />
+                <label htmlFor="file-upload-thing">
+                    <Fab component='span' color={'default'} variant={'extended'}><AddIcon className={classes.addIcon}/> Add score</Fab>
+                </label>
+            </> : <Typography variant={'subtitle1'}>No score available</Typography>}
+        </div>
+        }
     </Paper>;
 };
 
@@ -385,5 +425,5 @@ export default connect(state => ({
     transportTime: state.transport?.currentTime,
     rehearsalState: state.rehearsalState,
     annotations: state.project?.scoreAnnotations,
-    transportState: state.transport?.state,
+    scoreUrl: state.project?.scoreUrl,
 }))(Score);

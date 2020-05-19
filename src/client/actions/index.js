@@ -428,6 +428,14 @@ export const removeScoreKeyframe = kf => async (dispatch, getState) => {
     })));
 }
 
+export const removeScoreSystem = system => async (dispatch, getState) => {
+    await dispatch(annotateScore(produce(getState().project?.scoreAnnotations || {}, annotations => {
+        if (annotations.timing.systems) {
+            annotations.timing.systems = annotations.timing.systems.filter(s => s.x !== system.x || s.y !== system.y || s.width !== system.width || s.height !== system.height || s.page !== system.page);
+        }
+    })));
+}
+
 export const clearScoreAnnotations = () => async (dispatch, getState) => {
     await dispatch(annotateScore({}));
 }
