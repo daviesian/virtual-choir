@@ -129,6 +129,8 @@ let useStyles = makeStyles(theme => ({
         borderRadius: 8,
         transition: 'opacity 1s',
         zIndex: 10,
+        pointerEvents: 'none',
+        opacity: 0.8,
     },
     hidden: {
         opacity: 0,
@@ -251,7 +253,7 @@ const Item = ({classes, lane, item, zoom, itemRightClick, transportTime}) => {
                src={item.videoUrl}
                autoPlay={true}
                style={{
-                   right: `calc(100% - ${zoom * transportTime}px)`,
+                   right: `calc(100% - ${zoom * transportTime}px + 8px)`,
                }}
         />
     </React.Fragment>

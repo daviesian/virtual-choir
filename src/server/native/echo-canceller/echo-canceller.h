@@ -1,3 +1,4 @@
+#include <iostream> // std::cout
 
 // M_PI isn't defined on Windows.
 #ifndef M_PI
@@ -40,8 +41,11 @@ public:
 		auto mic = numeric::wrap(micSamples, micLength);
 
 		int offsetSamples = linearRemoval(speaker, mic);
+
 		// Strength: between 0 and 1
 		energySuppression(speaker, mic, 0.5);
+
+		normalise(mic);
 
 		return offsetSamples;
 	}
@@ -175,9 +179,9 @@ public:
 				subtractionCross[i] += micEnergy*refEnergy;
 				subtractionEnergy[i] += refEnergy*refEnergy;
 
-				double energyFactor = subtractionCross[i]/(subtractionEnergy[i]+1e6);
+				double energyFactor = subtractionCross[i]/(subtractionEnergy[i]+1e-6);
 				double subtractedEnergy = micEnergy - strength*energyFactor*refEnergy;
-				double ampFactor = sqrt(std::max(0.0, subtractedEnergy)/micEnergy);
+				double ampFactor = sqrt(std::max(0.0, subtractedEnergy)/(micEnergy+1e-6));
 				micSpectrum[i] *= ampFactor;
 				micSpectrum[i2] *= ampFactor;
 			}
@@ -189,6 +193,17 @@ public:
 		}
 		for (size_t i = 0; i < output.size(); ++i) {
 			mic[i] = output[i].real();
+		}
+	}
+
+	template <typename Array1>
+	void normalise(Array1 &mic) {
+		float max = 0;
+		for (size_t i = 0; i < mic.size(); i++) {
+			max = std::max(max, std::abs(mic[i]));
+		}
+		if (max > 1e-6) {
+			mic /= max;
 		}
 	}
 };
