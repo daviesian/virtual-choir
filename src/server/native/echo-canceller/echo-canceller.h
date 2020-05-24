@@ -1,4 +1,5 @@
-#include <iostream> // std::cout
+#include <iostream>
+#include <fstream>
 
 // M_PI isn't defined on Windows.
 #ifndef M_PI
@@ -36,11 +37,12 @@ class EchoCanceller {
 public:
 	EchoCanceller(double sampleRate) : sampleRate(sampleRate) {}
 
-	int cancel(float *speakerSamples, size_t speakerLength, float *micSamples, size_t micLength) {
+	int cancel(float *speakerSamples, size_t speakerLength, float *micSamples, size_t micLength, std::string &itemId) {
 		auto speaker = numeric::wrap(speakerSamples, speakerLength);
 		auto mic = numeric::wrap(micSamples, micLength);
 
-		int offsetSamples = linearRemoval(speaker, mic);
+
+		int offsetSamples = linearRemoval(speaker, mic, itemId);
 
 		// Strength: between 0 and 1
 		energySuppression(speaker, mic, 0.5);
@@ -51,7 +53,7 @@ public:
 	}
 
 	template <typename Array1, typename Array2>
-	int linearRemoval(Array1 &speaker, Array2 &mic) {
+	int linearRemoval(Array1 &speaker, Array2 &mic, std::string &itemId) {
 		size_t chunkSamples = (int)(sampleRate*impulseMs*0.001);
 		size_t chunkStep = chunkSamples/4;
 
@@ -141,6 +143,13 @@ public:
 				mic[i] = 0;
 			}
 		}
+
+		std::ofstream myfile;
+		myfile.open (".items/" + itemId + ".impulse");
+		for (size_t i = 0; i < impulse.size(); i++) {
+			myfile << std::to_string(abs(impulse[i])) << std::endl;
+		}
+		myfile.close();
 
 		return shiftSamples;
 	}

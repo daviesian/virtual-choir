@@ -57,7 +57,7 @@ module.exports = {
     output: {
         path: path.resolve(__dirname, "dist"),
         publicPath: "/",
-        filename: "client.js",
+        filename: "[name].client.js",
     },
     devtool: false, // We'll configure source maps ourselves, thanks very much.
     plugins: [

@@ -1,5 +1,6 @@
 import recorderSrc from '!!raw-loader!babel-loader!./recorder.js';
 import calibratorSrc from '!!raw-loader!babel-loader!./calibrator.js';
+import noiseGeneratorSrc from '!!raw-loader!babel-loader!./noiseGenerator.js';
 import drifterSrc from '!!raw-loader!babel-loader!./drifter.js';
 
 import {recordingFinished, setTransportTime} from "../../actions/audioActions";
@@ -206,6 +207,13 @@ export const init = async (inputId, outputId, dispatch) => {
     var oscillatorNode = s.context.createOscillator();
     oscillatorNode.connect(s.recorderNode); // To make it run continuously. Ugh.
 
+    s.noiseVolume = 0.2;
+    s.noiseGeneratorNode = await createAudioWorkletNode(s.context, 'NoiseGenerator', noiseGeneratorSrc, {
+        numberOfOutputs: 1,
+        numberOfInputs: 0,
+    });
+    s.noiseGeneratorNode.connect(s.recorderNode);
+
 
     s.calibratorNode = await createAudioWorkletNode(s.context, 'calibrator', calibratorSrc, {
         numberOfOutputs: 1,
@@ -360,12 +368,19 @@ export const seek = time => {
 };
 
 export const record = async() => {
+    let noiseVol = s.noiseGeneratorNode.parameters.get("volume");
+    noiseVol.cancelScheduledValues(s.context.currentTime);
+    noiseVol.linearRampToValueAtTime(s.noiseVolume, s.context.currentTime + 1);
+    s.noiseGeneratorNode.connect(s.recorderNode);
     s.recorderNode.parameters.get("recording").value = 1;
     s.mediaRecorder.start(10000);
     return true;
 };
 
 export const stopRecord = () => {
+    let noiseVol = s.noiseGeneratorNode.parameters.get("volume");
+    noiseVol.cancelScheduledValues(s.context.currentTime);
+    noiseVol.value = 0;
     s.recorderNode.parameters.get("recording").value = 0;
     if (s.mediaRecorder.state === "recording") {
         s.mediaRecorder.stop();

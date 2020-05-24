@@ -16,6 +16,7 @@ Napi::Number cancel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     auto referenceAudio = info[0].As<Napi::ArrayBuffer>();
     auto recordedAudio = info[1].As<Napi::ArrayBuffer>();
+    auto itemId = info[2].As<Napi::String>();
 
     float* referenceData = (float*)referenceAudio.Data();
     float* recordedData = (float*)recordedAudio.Data();
@@ -25,7 +26,7 @@ Napi::Number cancel(const Napi::CallbackInfo& info) {
     log(env, {"Cancelling", std::to_string(recLength), "samples of recorded audio"});
 
     EchoCanceller canceller(44100);
-	auto offset = canceller.cancel(referenceData, refLength, recordedData, recLength);
+	auto offset = canceller.cancel(referenceData, refLength, recordedData, recLength, std::string(itemId));
 
     log(env, {"Got offset of", std::to_string(offset), "samples (that's", std::to_string(offset/44100.0), "ms)"});
 

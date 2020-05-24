@@ -45,13 +45,30 @@ const { RTCAudioSink, RTCVideoSink, RTCVideoSource, RTCAudioSource, i420ToRgba, 
 let ffmpeg = require("fluent-ffmpeg");
 
 
+let exportWav = (rawAudioFilePath) => {
+    return new Promise((resolve, reject) => ffmpeg(rawAudioFilePath)
+        // Extract the recorded audio from the video
+        .inputFormat("f32le")
+        .output(rawAudioFilePath + ".wav")
+        .on('error', reject)
+        .on('end', resolve)
+        .run());
+}
+
+// exportWav(`.items/533c01d2-41a1-4fd2-9895-d3516e38320e.aud`).then(()=>{
+//     process.exit(0);
+// }).catch(e => {
+//     console.error(e);
+//     process.exit(0);
+// });
+
 let align = (itemId) => {
     let micBuffer = fs.readFileSync(`.items/${itemId}.aud`)
     let recordedAudio = new Float32Array(micBuffer.buffer, 0, micBuffer.byteLength / 4);
     let referenceBuffer = fs.readFileSync(`.items/${itemId}.reference.aud`);
     let referenceAudio = new Float32Array(referenceBuffer.buffer, 0, referenceBuffer.byteLength / 4);
 
-    let offset = echoCanceller.cancel(referenceAudio.buffer, recordedAudio.buffer);
+    let offset = echoCanceller.cancel(referenceAudio.buffer, recordedAudio.buffer, itemId);
 
     fs.writeFileSync(`.items/${itemId}.cancelled.aud`, recordedAudio);
 
@@ -355,7 +372,7 @@ let messageHandlers = {
     },
     newItem: async (client, { itemId, laneId, videoBytes, backingTrackId, referenceOutputStartTime }, data) => {
         requireUuid(itemId);
-        clientLog(client, "New item:", data.length-videoBytes, "bytes of audio, ", videoBytes, "bytes of video");
+        clientLog(client, "New item:", itemId, data.length-videoBytes, "bytes of audio, ", videoBytes, "bytes of video");
         fs.mkdirSync(".items", {recursive: true});
         fs.writeFileSync(`.items/${itemId}.original.vid`, data.subarray(0,videoBytes));
         fs.writeFileSync(`.items/${itemId}.reference.aud`, data.subarray(videoBytes));
@@ -379,6 +396,10 @@ let messageHandlers = {
             .run());
 
         let offset = align(itemId);
+
+        await exportWav(`.items/${itemId}.aud`);
+        await exportWav(`.items/${itemId}.cancelled.aud`);
+        await exportWav(`.items/${itemId}.reference.aud`);
 
         let lane = await getLane(laneId);
         if (!lane) {

@@ -9,3 +9,5 @@
 .lyrics
 .scores
 choir.db
+/jupyter/env
+/jupyter/.*

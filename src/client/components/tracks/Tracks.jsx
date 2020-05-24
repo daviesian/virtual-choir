@@ -90,6 +90,9 @@ let useStyles = makeStyles(theme => ({
     },
     disabledItem: {
         backgroundColor: grey[500],
+        '&:hover': {
+            backgroundColor: grey[500],
+        }
     },
     firstUserLane: {
         borderTop: [["2px solid", blueGrey[300]]],
