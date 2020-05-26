@@ -323,9 +323,9 @@ let Score = ({rehearsalState, conducting, transportTime, scoreUrl, annotations, 
 
     let canvasScroll = e => {
         if (e.deltaY < 0) {
-            setPageNumber(Math.max(1, pageNumber - 1));
+            setPageNumber(n => Math.max(1, n - 1));
         } else {
-            setPageNumber(Math.min(pageNumber + 1, pdf.numPages));
+            setPageNumber(n => Math.min(n + 1, pdf.numPages));
         }
         e.stopPropagation();
         e.preventDefault(); // TODO: Make this event handler non-passive, then do this to prevent zoom.
