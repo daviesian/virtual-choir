@@ -170,7 +170,7 @@ const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, lyrics, s
         sidebarWidth,
     });
 
-    let [selectedPanel, setSelectedPanel] = useState(rehearsalState?.mainPanel || 'tracks');
+    let [selectedPanel, setSelectedPanel] = useState(rehearsalState?.mainPanel || 'score');
     let [profileOpen, setProfileOpen] = useState(false);
 
     let choosePanel = useCallback(panel => {
