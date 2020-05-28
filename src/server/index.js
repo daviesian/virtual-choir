@@ -212,6 +212,12 @@ let _saveAndBroadcastProject = async (client, project) => {
 
 }
 
+let _createLane = async (projectId, userId) => {
+    let laneId = uuid();
+    let laneIdx = (await listLanes(projectId)).length;
+    return await addLane(laneId, projectId, userId, '', laneIdx, true);
+}
+
 let messageHandlers = {
     updateUser: async (client, {user}) => {
         if (client.user.userId === user.userId) {
@@ -404,12 +410,10 @@ let messageHandlers = {
         let lane = await getLane(laneId);
         if (!lane) {
             // No valid lane was provided. Create a new lane for this user.
-            laneId = uuid();
-            let laneIdx = (await listLanes(client.room.currentProjectId)).length;
-            lane = await addLane(laneId, client.room.currentProjectId, client.user.userId, '', laneIdx, true);
+            lane = await _createLane(client.room.currentProjectId, client.user.userId);
         }
         let itemIdx = (await listItemsByProject(client.room.currentProjectId)).filter(i => i.laneId === lane.laneId).length;
-        let item = await addItem(itemId, laneId, referenceOutputStartTime, 0, 0, itemIdx, `/.items/${itemId}.cancelled.aud`, `/.items/${itemId}.vid`, offset);
+        let item = await addItem(itemId, lane.laneId, referenceOutputStartTime, 0, 0, itemIdx, `/.items/${itemId}.cancelled.aud`, `/.items/${itemId}.vid`, offset);
 
         for (let c of client.room.clients) {
             c.sendJSON({cmd: "newItem", item, lane, user: client.user});
@@ -452,8 +456,16 @@ let messageHandlers = {
     },
     updateItem: async (client, {item}) => {
         requireConductor(client); // TODO: Or owner of item.
+        let lane = await getLane(item.laneId);
+        if (item.newLaneId !== undefined) {
+            lane = await _createLane(client.room.currentProjectId, lane.userId);
+            item.laneId = lane.laneId;
+            delete item.newLaneId;
+        }
         await saveItem(item);
-        conduct(client.room, {cmd: "updateItem", item});
+        for (let c of client.room.clients) {
+            c.sendJSON({cmd: "updateItem", item, lane});
+        }
     },
     setRehearsalState: async (client, {roomId, rehearsalState}) => {
         requireConductor(client);

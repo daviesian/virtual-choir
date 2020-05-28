@@ -132,7 +132,7 @@ export const targetLane = (userId, laneId, them) => async (dispatch, getState) =
     }
 };
 
-export const updateItem = (item, them=false) => async (dispatch, getState) => {
+export const updateItem = (item, lane, them=false) => async (dispatch, getState) => {
     if (them) {
         dispatch({
             type: "ws/call",
@@ -141,10 +141,17 @@ export const updateItem = (item, them=false) => async (dispatch, getState) => {
         });
     }
 
-    await dispatch({
+    if (lane && !(lane.laneId in getState().lanes)) {
+        await dispatch({
+            type: "LANE_ADDED",
+            lane,
+        });
+    }
+
+    dispatch({
         type: "audio/updateItem",
         item,
-    });
+    })
 
     dispatch({
         type: "ITEM_UPDATED",
@@ -310,6 +317,8 @@ export const deleteItem = (itemId, them) => async (dispatch, getState) => {
         itemId,
     });
 }
+
+export const moveItemToNewLane = (item, them) => updateItem({...item, newLaneId: null}, null, them);
 
 export const deleteLane = (laneId, them) => async (dispatch, getState) => {
     for (let [itemId, item] of Object.entries(getState().items || {})) {

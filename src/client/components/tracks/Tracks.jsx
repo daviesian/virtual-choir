@@ -14,7 +14,7 @@ import Slider from "@material-ui/core/Slider";
 import format from "format-duration";
 import grey from "@material-ui/core/colors/grey";
 import blueGrey from "@material-ui/core/colors/blueGrey";
-import {deleteItem, deleteLane, seek, updateLane} from "../../actions/audioActions";
+import {deleteItem, deleteLane, moveItemToNewLane, seek, updateLane} from "../../actions/audioActions";
 import IconButton from "@material-ui/core/IconButton";
 import DeleteIcon from "@material-ui/icons/Delete";
 import Menu from "@material-ui/core/Menu";
@@ -390,6 +390,7 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
             }
         >
             <MenuItem onClick={async () => {closeItemContextMenu(); (await confirm(dispatch, 'Are you sure you want to delete this item?', 'Delete Item?')) && dispatch(deleteItem(itemContextMenu.item.itemId, conducting))}}>Delete Item</MenuItem>
+            <MenuItem onClick={async () => {closeItemContextMenu(); dispatch(moveItemToNewLane(itemContextMenu.item, conducting)); }}>Move to new track</MenuItem>
         </Menu>
     </Paper>
 }

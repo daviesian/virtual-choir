@@ -79,8 +79,8 @@ export default store => next => {
         setTargetLane: ({userId, laneId}) => {
             store.dispatch(targetLane(userId, laneId, false));
         },
-        updateItem: ({item}) => {
-            store.dispatch(updateItem(item, false));
+        updateItem: ({item, lane}) => {
+            store.dispatch(updateItem(item, lane, false));
         },
         newItem: ({item, lane, user}) => {
             store.dispatch(loadItem(item, lane, user))

@@ -207,7 +207,7 @@ export const init = async (inputId, outputId, dispatch) => {
     var oscillatorNode = s.context.createOscillator();
     oscillatorNode.connect(s.recorderNode); // To make it run continuously. Ugh.
 
-    s.noiseVolume = 0.2;
+    s.noiseVolume = 0.1;
     s.noiseGeneratorNode = await createAudioWorkletNode(s.context, 'NoiseGenerator', noiseGeneratorSrc, {
         numberOfOutputs: 1,
         numberOfInputs: 0,
@@ -329,6 +329,10 @@ export const loadItem = async ({itemId, laneId, startTime, startOffset, endOffse
         duration: audioBuffer.duration,
         rms: await getAudioBufferRMSImageURL(audioBuffer, audioBuffer.duration * 40),
     };
+};
+
+export const updateItem = async ({itemId, laneId}) => {
+    s.items[itemId].laneId = laneId;
 };
 
 export const play = startTime => {

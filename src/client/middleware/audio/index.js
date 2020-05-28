@@ -5,6 +5,7 @@ import {
     getDevices,
     init,
     loadItem,
+    updateItem,
     play,
     record,
     seek,
@@ -140,7 +141,7 @@ export default store => next => {
                     return await loadItem(action.item);
 
                 case "updateItem":
-                    throw new Error("audio/updateItem not implemented");
+                    return await updateItem(action.item);
 
                 case "deleteItem":
                     if (s.items[action.itemId]) {
