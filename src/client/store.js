@@ -29,7 +29,6 @@ const initialState = {
     devices: null,
     user: null,
     users: {},
-    rehearsalState: {},
     rtcStarted: false,
     speaking: false,
     speaker: null,
@@ -207,6 +206,12 @@ let rootReducer = produce((state, action) => {
             state.transport.state = 'recording';
             break;
 
+        case "RECORDING_STOPPED":
+            if (state.transport?.state === 'recording') {
+                state.transport.state = 'playing';
+            }
+            break;
+
         case "STOPPED":
             state.transport.state = null;
             break;
@@ -252,8 +257,7 @@ let rootReducer = produce((state, action) => {
             break;
 
         case "SET_REHEARSAL_STATE":
-            state.rehearsalState = action.rehearsalState;
-
+            state.room.rehearsalState = action.rehearsalState;
             break;
 
         case "RTC_STARTED":

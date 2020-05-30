@@ -40,5 +40,5 @@ let Layers = ({backingTrack, tracks=[], transportTime, rehearsalState, dispatch}
 
 export default connect(state =>({
     transportTime: state.transport.currentTime,
-    rehearsalState: state.rehearsalState,
+    rehearsalState: state.room?.rehearsalState,
 }))(Layers);

@@ -3,7 +3,7 @@ import calibratorSrc from '!!raw-loader!babel-loader!./calibrator.js';
 import noiseGeneratorSrc from '!!raw-loader!babel-loader!./noiseGenerator.js';
 import drifterSrc from '!!raw-loader!babel-loader!./drifter.js';
 
-import {recordingFinished, setTransportTime} from "../../actions/audioActions";
+import {recordingFinished, setTransportTime, startRecording, stopRecording} from "../../actions/audioActions";
 import {v4 as uuid} from "uuid";
 import {createAudioWorkletNode} from "./util";
 import s from "./state";
@@ -29,6 +29,19 @@ let scheduleUpcomingItems = () => {
         }
     }
 };
+
+const maybePunchInOrOut = () => {
+    if (s.punchIn !== null && s.punchOut !== null) {
+        let recording = s.recorderNode.parameters.get("recording").value === 1;
+        let transportTime = s.context.currentTime - s.transportStartTime;
+
+        if (!recording && transportTime > s.punchIn && transportTime < s.punchOut) {
+            s.dispatch(startRecording(true, undefined)); // TODO: We need a way of optionally not forcing everyone to record.
+        } else if (recording && (transportTime < s.punchIn || transportTime > s.punchOut)) {
+            s.dispatch(stopRecording(true, undefined)); // TODO: Ditto
+        }
+    }
+}
 
 export const getDevices = async () => {
     let m = await navigator.mediaDevices.getUserMedia({audio: true});
@@ -125,6 +138,8 @@ export const init = async (inputId, outputId, dispatch) => {
     if (s.context) {
         return;
     }
+
+    s.dispatch = dispatch;
 
     //s.audioOut = new Audio();
     //await s.audioOut.setSinkId(outputId);
@@ -287,6 +302,8 @@ export const init = async (inputId, outputId, dispatch) => {
             // We're still playing. Schedule any layers that are coming up.
             scheduleUpcomingItems();
 
+            maybePunchInOrOut();
+
             if (offsetTime > 0) {
                 for (let c of s.transportTimeCallbacks) {
                     c(offsetTime);
@@ -406,3 +423,12 @@ export const disableLane = (laneId) => {
     }
     delete s.enabledLanes[laneId];
 };
+
+export const setPunchTimes = (punchIn, punchOut) => {
+    if (punchIn !== null && punchOut !== null && punchIn < punchOut) {
+        s.punchIn = punchIn;
+        s.punchOut = punchOut;
+    } else {
+        s.punchIn = s.punchOut = null;
+    }
+}

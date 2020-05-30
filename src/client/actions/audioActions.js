@@ -215,6 +215,9 @@ export const stop = (me=true, them=false) => async (dispatch, getState) => {
 
 export const startRecording = (me=true, them=false) => async (dispatch, getState) => {
 
+    if (them === undefined) {
+        them = getState().conducting;
+    }
     let wasPlaying = getState().playing
 
     if (!wasPlaying) {
@@ -248,6 +251,10 @@ export const startRecording = (me=true, them=false) => async (dispatch, getState
 };
 
 export const stopRecording = (me=true, them=false) => async (dispatch, getState) => {
+
+    if (them === undefined) {
+        them = getState().conducting;
+    }
 
     if (!await dispatch({type: "audio/stopRecording"})) {
         return;

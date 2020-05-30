@@ -93,6 +93,6 @@ let Lyrics = ({lyrics, rehearsalState, conducting, transportTime, dispatch, clas
 export default connect(state => ({
     conducting: state.conducting,
     transportTime: state.transport?.currentTime,
-    rehearsalState: state.rehearsalState,
+    rehearsalState: state.room?.rehearsalState,
     lyrics: state.lyrics[state.project?.lyricsUrl],
 }))(Lyrics);

@@ -184,7 +184,7 @@ const Main = ({rtcStarted, user, conducting, muted, speaker, speaking, lyrics, s
         if(rehearsalState?.mainPanel && selectedPanel !== rehearsalState?.mainPanel) {
             setSelectedPanel(rehearsalState.mainPanel);
         }
-    }, [rehearsalState.mainPanel]);
+    }, [rehearsalState?.mainPanel]);
 
     useEffect(() => {
         if (user && !user?.name) {
@@ -288,6 +288,6 @@ export default connect(state => ({
     loading: state.loading,
     loadingMessage: state.loadingMessage,
     loadingProgress: state.loadingProgress,
-    rehearsalState: state.rehearsalState,
+    rehearsalState: state.room?.rehearsalState,
     modals: state.modals,
 }))(Main);

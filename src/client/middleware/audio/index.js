@@ -10,7 +10,7 @@ import {
     record,
     seek,
     stop,
-    stopRecord,
+    stopRecord, setPunchTimes,
 } from "./core";
 import s from "./state";
 
@@ -122,7 +122,7 @@ export default store => next => {
                     return record();
 
                 case "stopRecording":
-                    if (s.transportStartTime === null || s.videoRecorder.state !== "recording") {
+                    if (s.transportStartTime === null || s.mediaRecorder.state !== "recording") {
                         return false; // Can't stop recording unless we're already recording.
                     }
                     return stopRecord();
@@ -178,6 +178,11 @@ export default store => next => {
                 case "LANE_DELETED":
                     disableLane(action.laneId);
                     break;
+
+                case "SET_REHEARSAL_STATE":
+                    setPunchTimes(action.rehearsalState?.punchIn, action.rehearsalState?.punchOut);
+                    break;
+
             }
             return next(action);
         }

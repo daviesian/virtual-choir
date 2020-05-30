@@ -157,10 +157,12 @@ export const loadProject = (projectId, conduct = false) => async dispatch => {
 export const projectLoaded = ({project, lanes, items, users}) => async (dispatch, getState)=> {
     dispatch(startLoading("Loading project..."));
     try {
+        if (getState().project) {
+            dispatch(setRehearsalState({}));
+        }
         dispatch({
             type: "CLEAR_PROJECT",
         });
-        dispatch(setRehearsalState({}));
 
         // Do this first, even though it isn't finished, so the UI looks quicker.
         dispatch({

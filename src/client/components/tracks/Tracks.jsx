@@ -123,6 +123,15 @@ let useStyles = makeStyles(theme => ({
         backgroundColor: theme.palette.primary[500],
         pointerEvents: 'none',
     },
+    punchPeriod: {
+        position: "absolute",
+        top: 0,
+        height: '100%',
+        backgroundColor: 'rgba(255,0,0,0.2)',
+        borderLeft: [[2, 'solid', 'rgba(192,0,0,0.4)']],
+        borderRight: [[2, 'solid', 'rgba(192,0,0,0.4)']],
+        pointerEvents: 'none'
+    },
     playbackVideo: {
         position: 'absolute',
         height: 'calc(100% - 8px)',
@@ -296,7 +305,18 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
 
     let tracksClick = useCallback(e => {
         if (e.pageX > sidebarWidth) {
-            dispatch(seek(Math.max(0, range[0] + ((e.pageX - sidebarWidth - 8) / zoom)), true, conducting))
+            let t = Math.max(0, range[0] + ((e.pageX - sidebarWidth - 8) / zoom));
+            console.log(e.button);
+            if (e.shiftKey) {
+                if (e.button === 0) {
+                    dispatch(setRehearsalState({...rehearsalState, punchIn: t}, conducting));
+                } else if (e.button === 2) {
+                    dispatch(setRehearsalState({...rehearsalState, punchOut: t}, conducting));
+                }
+            } else {
+                dispatch(seek(t, true, conducting))
+            }
+            e.preventDefault();
         }
     });
 
@@ -323,12 +343,14 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
     };
 
     let itemRightClick = useCallback((e,item) => {
-        setItemContextMenu({
-            mouseX: e.clientX,
-            mouseY: e.clientY,
-            item,
-        });
-        e.preventDefault();
+        if (!e.shiftKey) {
+            setItemContextMenu({
+                mouseX: e.clientX,
+                mouseY: e.clientY,
+                item,
+            });
+            e.preventDefault();
+        }
     });
 
     let closeItemContextMenu = useCallback(() => {
@@ -336,7 +358,7 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
     });
 
     return <Paper square elevation={0} className={clsx(classes.root, className)}>
-        <div className={classes.tracks} onClick={tracksClick}>
+        <div className={classes.tracks} onClick={tracksClick} onContextMenu={tracksClick}>
             {users.map((user,ui) => {
 
                 return <React.Fragment key={`${ui}`}>
@@ -369,6 +391,10 @@ let Tracks = ({className, users, endTime, sidebarWidth, dispatch, transportTime,
             {transportTime >= range[0] && transportTime <= range[2] && <div className={classes.cursor} style={{
                 left: `calc(${sidebarWidth+8}px + ${zoom * (transportTime - range[0])}px)`
             }}/>}
+            {rehearsalState?.punchIn != null && rehearsalState?.punchOut != null && rehearsalState?.punchIn < rehearsalState?.punchOut && <div className={classes.punchPeriod} style={{
+                left: `calc(${sidebarWidth+8}px + ${zoom * rehearsalState.punchIn}px)`,
+                width: `${zoom * (rehearsalState.punchOut - rehearsalState.punchIn)}px`
+            }}/>}
         </div>
         <div className={classes.fixedBottomRow}>
             <div className={clsx(classes.timeDisplay)}>
@@ -400,5 +426,5 @@ export default connect(state => ({
     endTime: selectEndTime(state),
     transportTime: state.transport.currentTime,
     conducting: state.conducting,
-    rehearsalState: state.rehearsalState,
+    rehearsalState: state.room?.rehearsalState,
 }))(Tracks);

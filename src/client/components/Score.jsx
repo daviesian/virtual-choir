@@ -7,7 +7,7 @@ import {
     addScore,
     addScoreTimingKeyframe,
     addScoreTimingSystem,
-    removeScoreKeyframe, removeScoreSystem,
+    removeScoreKeyframe, removeScoreSystem, setRehearsalState,
 } from "../actions";
 import Paper from "@material-ui/core/Paper";
 import clsx from "clsx";
@@ -173,7 +173,7 @@ let timeToPdfCursor = (time, keyframes, systems) => {
     }
 };
 
-let PdfPageOverlay = React.forwardRef(({className, pdfScale, pageNumber, cursor, setCursorY, transportTime, annotations, conducting, dispatch}, canvas) => {
+let PdfPageOverlay = React.forwardRef(({className, pdfScale, pageNumber, cursor, setCursorY, editing, setEditing, punchCursors, transportTime, annotations, rehearsalState, conducting, dispatch}, canvas) => {
     let classes = useStyles();
 
     let canvasToPdf = useCallback(({x,y}) => {
@@ -206,8 +206,6 @@ let PdfPageOverlay = React.forwardRef(({className, pdfScale, pageNumber, cursor,
 
     let [grabPoint, setGrabPoint] = useState(null);
     let [selectionBoxCorner, setSelectionBoxCorner] = useState(null);
-    let [editing, setEditing] = useState(false);
-    let [cursorVerticalPos, setCursorVerticalPos] = useState(null);
 
     let canvasMouseDown = useCallback(e => {
         let pdfPoint = canvasToPdf({x: e.pageX, y: e.pageY});
@@ -237,6 +235,7 @@ let PdfPageOverlay = React.forwardRef(({className, pdfScale, pageNumber, cursor,
 
         if (distance(grabPoint, pdfPoint)*pdfScale < 10) {
             // This was a click
+            let clickTime = pdfPointToTime(pdfPoint, annotations?.timing?.keyframes || [], annotations?.timing?.systems || []);
             if (e.ctrlKey && e.button === 0) {
                 // Ctrl-click
                 dispatch(addScoreTimingKeyframe({
@@ -244,8 +243,14 @@ let PdfPageOverlay = React.forwardRef(({className, pdfScale, pageNumber, cursor,
                     time: grabPoint.time,
                     page: pageNumber,
                 }))
+            } else if (e.shiftKey && e.button === 0) {
+                // Shift-click
+                dispatch(setRehearsalState({...rehearsalState, punchIn: clickTime}, conducting));
+            } else if (e.shiftKey && e.button === 2) {
+                // Shift-right-click
+                dispatch(setRehearsalState({...rehearsalState, punchOut: clickTime}, conducting));
             } else if (e.ctrlKey && e.button === 2) {
-                // Right click
+                // Normal Right click
                 let kfs = annotations?.timing?.keyframes || [];
                 let nearbyKeyframe = kfs.find(k => distance(k, pdfPoint)*pdfScale < 5);
                 if (nearbyKeyframe) {
@@ -262,7 +267,6 @@ let PdfPageOverlay = React.forwardRef(({className, pdfScale, pageNumber, cursor,
                     }
                 }
             } else {
-                let clickTime = pdfPointToTime(pdfPoint, annotations?.timing?.keyframes || [], annotations?.timing?.systems || []);
                 if (clickTime != null) {
                     dispatch(seek(clickTime, true, conducting));
                 }
@@ -326,6 +330,44 @@ let PdfPageOverlay = React.forwardRef(({className, pdfScale, pageNumber, cursor,
                     ctx.fill();
                 }
             }
+        } else {
+            if (punchCursors) {
+                console.log(punchCursors)
+                let {punchIn, punchOut} = punchCursors;
+                ctx.fillStyle = 'rgba(255,0,0,0.05)';
+                ctx.strokeStyle = 'rgba(192,0,0,0.4)';
+                //ctx.strokeWidth = 2;
+                if (punchIn.page === pageNumber && punchOut.page === pageNumber) {
+                    // Both on this page
+                    let punchInCanvas = pdfRectToCanvas(punchIn);
+                    let punchOutCanvas = pdfRectToCanvas(punchOut);
+                    if (punchIn.y === punchOut.y) {
+                        // Both on the same line
+                        ctx.fillRect(punchInCanvas.x, punchInCanvas.y, punchOutCanvas.x - punchInCanvas.x, punchInCanvas.height);
+                        ctx.strokeRect(punchInCanvas.x, punchInCanvas.y, 1, punchInCanvas.height);
+                        ctx.strokeRect(punchOutCanvas.x, punchOutCanvas.y, 1, punchOutCanvas.height);
+                    } else {
+                        // Each on different lines
+                        ctx.fillRect(punchInCanvas.x, punchInCanvas.y, 9999, punchInCanvas.height);
+                        ctx.strokeRect(punchInCanvas.x, punchInCanvas.y, 1, punchInCanvas.height);
+                        ctx.fillRect(0, punchInCanvas.y + punchInCanvas.height, 9999, punchOutCanvas.y - punchInCanvas.y - punchInCanvas.height);
+                        ctx.fillRect(0, punchOutCanvas.y, punchOutCanvas.x, punchOutCanvas.height);
+                        ctx.strokeRect(punchOutCanvas.x, punchOutCanvas.y, 1, punchOutCanvas.height);
+                    }
+                } else if (punchIn.page === pageNumber) {
+                    // Start on this page
+                    let punchInCanvas = pdfRectToCanvas(punchIn);
+                    ctx.fillRect(punchInCanvas.x, punchInCanvas.y, 9999, punchInCanvas.height);
+                    ctx.strokeRect(punchInCanvas.x, punchInCanvas.y, 1, punchInCanvas.height);
+                    ctx.fillRect(0, punchInCanvas.y + punchInCanvas.height, 9999, 9999);
+                } else if (punchOut.page === pageNumber) {
+                    // End on this page
+                    let punchOutCanvas = pdfRectToCanvas(punchOut);
+                    ctx.fillRect(0, 0, 9999, punchOutCanvas.y);
+                    ctx.fillRect(0, punchOutCanvas.y, punchOutCanvas.x, punchOutCanvas.height);
+                    ctx.strokeRect(punchOutCanvas.x, punchOutCanvas.y, 1, punchOutCanvas.height);
+                }
+            }
         }
 
 
@@ -346,7 +388,7 @@ let PdfPageOverlay = React.forwardRef(({className, pdfScale, pageNumber, cursor,
         }
         // renderTransportTime.current = transportTime;
 
-    }, [cursor, editing, annotations, transportTime, selectionBoxCorner]);
+    }, [cursor, editing, annotations, transportTime, selectionBoxCorner, punchCursors]);
 
     return <canvas ref={canvas} className={clsx(classes.pageOverlay, className)} onMouseDown={canvasMouseDown} onMouseMove={canvasMouseMove} onMouseUp={canvasMouseUp}/>
 });
@@ -442,6 +484,8 @@ let Score = ({rehearsalState, conducting, transportTime, scoreUrl, annotations, 
     let [pages, setPages] = useState(null);
     let [cursor, setCursor] = useState(null);
     let [cursorY, setCursorY] = useState(0);
+    let [editing, setEditing] = useState(false);
+    let [punchCursors, setPunchCursors] = useState(null);
 
     useEffect(() => {(async () => {
         if (scoreUrl) {
@@ -457,9 +501,9 @@ let Score = ({rehearsalState, conducting, transportTime, scoreUrl, annotations, 
     let scoreWheel = e => {
         if (e.ctrlKey) {
             if (e.deltaY < 0) {
-                setZoom(z => z*1.1);
+                setZoom(z => z * 1.1);
             } else {
-                setZoom(z => Math.max(1, z/1.1));
+                setZoom(z => Math.max(1, z / 1.1));
             }
             e.stopPropagation();
             e.preventDefault();
@@ -467,8 +511,26 @@ let Score = ({rehearsalState, conducting, transportTime, scoreUrl, annotations, 
     }
 
     useEffect(() => {
+        let kfs = annotations?.timing?.keyframes || [];
+        let sys = annotations?.timing?.systems || [];
+        if (rehearsalState?.punchIn != null && rehearsalState?.punchOut != null && rehearsalState?.punchIn < rehearsalState?.punchOut) {
+            let punchIn = timeToPdfCursor(rehearsalState.punchIn, kfs, sys);
+            let punchOut = timeToPdfCursor(rehearsalState.punchOut, kfs, sys);
+            if (punchIn && punchOut) {
+                setPunchCursors({
+                    punchIn,
+                    punchOut,
+                });
+            }
+        } else {
+            setPunchCursors(null);
+        }
+    }, [pages, rehearsalState?.punchIn, rehearsalState?.punchOut]);
+
+    useEffect(() => {
         score.current.addEventListener('mousewheel', scoreWheel);
-    },[score.current]);
+        return () => score.current?.removeEventListener('mousewheel', scoreWheel);
+    },[score.current, editing]);
 
     useEffect(() => {
         let kfs = annotations?.timing?.keyframes || [];
@@ -478,11 +540,13 @@ let Score = ({rehearsalState, conducting, transportTime, scoreUrl, annotations, 
     }, [transportTime]);
 
     useEffect(() => {
+        if (!editing) {
             score.current.scrollTo({top: cursorY.top - (score.current.getBoundingClientRect().height - cursorY.height)/3, behavior: 'smooth'});
+        }
     }, [cursorY?.height]);
 
     return <Paper ref={score} square elevation={0} className={clsx(props.className,classes.root)} onContextMenu={e => e.preventDefault()}>
-        {pages ? <> {pages.map((page, i) => <PdfPage key={i} {...{page, setCursorY, zoom, setZoom, annotations, transportTime, cursor, rehearsalState, conducting, dispatch}}/>)}
+        {pages ? <> {pages.map((page, i) => <PdfPage key={i} {...{page, setCursorY, zoom, setZoom, annotations, editing, setEditing, punchCursors, transportTime, cursor, rehearsalState, conducting, dispatch}}/>)}
         </> : <div className={classes.addContainer}>
             {scoreUrl ? <Typography variant={'subtitle1'}>Loading score...</Typography> : conducting ? <>
                 <input
@@ -504,7 +568,7 @@ let Score = ({rehearsalState, conducting, transportTime, scoreUrl, annotations, 
 export default connect(state => ({
     conducting: state.conducting,
     transportTime: state.transport?.currentTime,
-    rehearsalState: state.rehearsalState,
+    rehearsalState: state.room?.rehearsalState,
     annotations: state.project?.scoreAnnotations,
     scoreUrl: state.project?.scoreUrl,
 }))(Score);
