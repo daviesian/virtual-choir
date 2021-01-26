@@ -41,7 +41,7 @@
     "angulartics": "^0.17.2",
     "babel-loader": "^8.0.6",
     "babel-plugin-react-css-modules": "^5.2.6",
-    "bootstrap": "^3.3.7",
+    "bootstrap": "^3.4.1",
     "bootstrap-select": "^1.13.12",
     "clsx": "^1.1.0",
     "codemirror": "^5.48.2",
